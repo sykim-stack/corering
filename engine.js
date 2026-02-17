@@ -1,11 +1,20 @@
-// 차별화의 핵심: 남부 방언 사전
-const SOUTH_FILTER = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "vô" };
+const input = document.getElementById('userInput');
+const history = document.getElementById('chat-history');
+const header = document.getElementById('header');
+const modal = document.getElementById('modal-overlay');
+const sendBtn = document.getElementById('send-btn');
+const modalBody = document.getElementById('modal-body');
+
+input.addEventListener('input', () => {
+    input.value.length > 0 ? header.classList.add('glow-active') : header.classList.remove('glow-active');
+});
 
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
-    
+    header.classList.remove('glow-active');
+
     const tempId = Date.now();
     const isKorean = /[ㄱ-ㅎ|가-힣]/.test(text);
 
@@ -24,29 +33,26 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // [차별화 포인트 1] 방언 강제 주입
         if (target === 'VI') {
-            Object.keys(SOUTH_FILTER).forEach(k => {
-                result = result.replace(new RegExp(k, "gi"), SOUTH_FILTER[k]);
+            const DICT = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "vô" };
+            Object.keys(DICT).forEach(k => {
+                result = result.replace(new RegExp(k, "gi"), DICT[k]);
             });
         }
         
-        document.getElementById(`t-${tempId}`).innerText = result;
+        const finalResult = result;
+        document.getElementById(`t-${tempId}`).innerText = finalResult;
 
-        // [차별화 포인트 2] 클릭 시 1:1 매칭 칩 노출
         pairDiv.onclick = () => {
-            const oriWords = text.split(' ');
-            const transWords = result.split(' ');
-            let html = '<div class="analysis-list">';
+            const oriWords = text.split(/\s+/);
+            const transWords = finalResult.split(/\s+/);
+            let html = '';
             const max = Math.max(oriWords.length, transWords.length);
 
             for(let i=0; i<max; i++) {
                 const o = oriWords[i] ? oriWords[i].replace(/[.,!?]/g, '') : "";
                 const t = transWords[i] ? transWords[i].replace(/[.,!?]/g, '') : "";
                 if(!o && !t) continue;
-
-                // 한국어 입력 시: 베트남어(t)가 위, 한국어(o)가 아래
-                // 베트남어 입력 시: 한국어(t)가 위, 베트남어(o)가 아래
                 html += `
                     <div class="analysis-card">
                         <div class="card-main">
@@ -55,9 +61,25 @@ async function handleSend() {
                         </div>
                     </div>`;
             }
-            html += '</div>';
-            document.getElementById('modal-body').innerHTML = html;
-            document.getElementById('modal-overlay').style.display = 'flex';
+            modalBody.innerHTML = html;
+            modal.style.display = 'flex';
         };
-    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "오류"; }
+    } catch (e) {
+        document.getElementById(`t-${tempId}`).innerText = "연결 오류";
+    }
 }
+
+sendBtn.onclick = handleSend;
+input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
+document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if(e.target == modal) modal.style.display = 'none'; };
+
+document.getElementById('share-btn').onclick = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = 'URL 복사 완료!';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    });
+};
