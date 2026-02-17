@@ -3,22 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CORE-RING ENGINE</title>
-    <link rel="stylesheet" href="style.css"> </head>
+    <title>CORE-RING</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 <body>
     <header id="header">
-        <div class="logo-area"><span class="logo-core">CORE</span><span class="logo-ring">RING</span></div>
-        <div class="morse-r"><div class="m-dot"></div><div class="m-dash"></div><div class="m-dot"></div></div>
+        <div class="header-top">
+            <div class="logo-area">
+                <span class="logo-core">CORE</span><span class="logo-ring">RING</span>
+            </div>
+            <a href="#" class="btn-coffee">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+            </a>
+        </div>
+        <div class="morse-r">
+            <div class="m-dot"></div><div class="m-dash"></div><div class="m-dot"></div>
+        </div>
     </header>
 
     <main id="chat-history"></main>
 
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal-title">ANALYSIS REPORT</span>
+                <button id="modal-close">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
     <footer>
-        <input type="text" id="userInput" class="input-box" placeholder="심장을 깨우는 한마디..." autocomplete="off">
+        <input type="text" id="userInput" class="input-box" placeholder="심장을 입력하세요..." autocomplete="off">
         <button id="send-btn" class="btn-send">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </button>
     </footer>
 
-    <script src="engine.js"></script> </body>
+    <script src="engine.js"></script>
+</body>
 </html>
