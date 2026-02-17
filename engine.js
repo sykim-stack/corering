@@ -3,56 +3,68 @@ const DICT = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "v�
 const input = document.getElementById('userInput');
 const sendBtn = document.getElementById('send-btn');
 const history = document.getElementById('chat-history');
+const header = document.getElementById('header');
+
+// 입력창 모스부호 애니메이션
+input.oninput = () => {
+    if(input.value.length > 0) header.classList.add('glow-active');
+    else header.classList.remove('glow-active');
+};
 
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
     
-    // 입력창 비우기
     input.value = '';
+    header.classList.remove('glow-active');
 
-    // 화면에 내 말 표시
     const tempId = Date.now();
     const div = document.createElement('div');
     div.className = 'msg-box';
-    div.innerHTML = `<div class="trans-text" id="t-${tempId}">...</div><div class="origin-text">${text}</div>`;
+    div.innerHTML = `<div class="trans-text" id="t-${tempId}">분석 중...</div><div class="origin-text">${text}</div>`;
     history.appendChild(div);
-    history.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    
+    // 자동 스크롤
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
     try {
         const target = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
         
-        // 절대 경로로 서버에 요청
+        // Vercel 서버리스 함수 호출
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
+        
+        if (!res.ok) {
+            const errorInfo = await res.json();
+            throw new Error(errorInfo.error || '서버 응답 불안정');
+        }
+
         const data = await res.json();
         
         if (data.translations && data.translations[0]) {
             let result = data.translations[0].text;
 
-            // 남부 방언 필터
+            // 사장님의 코어 로직: 남부 방언 치환
             if (target === 'VI') {
                 Object.keys(DICT).forEach(k => {
-                    result = result.replace(new RegExp(k, "gi"), DICT[k]);
+                    const regex = new RegExp(k, "gi");
+                    result = result.replace(regex, DICT[k]);
                 });
             }
             document.getElementById(`t-${tempId}`).innerText = result;
         } else {
-            throw new Error("응답 형식 오류");
+            throw new Error('데이터 구조 불일치');
         }
     } catch (e) {
-        document.getElementById(`t-${tempId}`).innerText = "연결 실패: " + e.message;
+        document.getElementById(`t-${tempId}`).innerText = "엔진 오류: " + e.message;
     }
 }
 
-// 버튼 클릭 이벤트 바인딩
-sendBtn.addEventListener('click', (e) => {
+// 이벤트 연결
+sendBtn.onclick = (e) => {
     e.preventDefault();
     handleSend();
-});
+};
 
-// 엔터키 이벤트 바인딩
-input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleSend();
-    }
-});
+input.onkeypress = (e) => {
+    if (e.key === 'Enter') handleSend();
+};
