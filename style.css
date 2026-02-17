@@ -1,41 +1,39 @@
-:root { --gold: #D4AF37; --bg: #000; --white: #fff; }
+:root { --gold: #D4AF37; --bg: #000; --white: #fff; --core-dark: #444; }
 * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
 body { background: var(--bg); color: var(--white); margin: 0; font-family: sans-serif; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
+/* 로고 확정 디자인 */
 header { padding: 15px 25px; border-bottom: 1px solid #1a1a1a; }
 .header-top { display: flex; justify-content: space-between; align-items: center; }
 .logo-area { font-weight: 900; font-size: 1.6rem; letter-spacing: -1px; }
-.logo-core { color: #444; } .logo-ring { color: #fff; }
-.btn-share { color: var(--gold); cursor: pointer; }
+.logo-core { color: var(--core-dark); } /* CORE: 검정 계열 */
+.logo-ring { color: var(--white); }    /* RING: 흰색 */
 .morse-r { margin-top: 5px; display: flex; gap: 4px; padding-left: 70px; }
-.m-dot, .m-dash { background: var(--gold); height: 4px; border-radius: 2px; }
-.m-dot { width: 4px; } .m-dash { width: 14px; }
+.m-dot, .m-dash { background: var(--gold); height: 4px; border-radius: 2px; } /* 모스부호: 황금색 */
 
 main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 25px; }
 
-/* 말풍선: 한 색상 통일 및 구분선 제거 */
+/* 말풍선: 한 색상 통일, 80% 고정, 구분선 없음 */
 .msg-pair { display: flex; flex-direction: column; width: 80%; cursor: pointer; background: #151515; border-radius: 20px; padding: 18px; border: 1px solid #222; }
 .pair-left { align-self: flex-start; text-align: left; }
 .pair-right { align-self: flex-end; text-align: right; }
 
-/* 1번째 언어 (타겟: 크게) */
-.box-top { color: var(--gold); font-size: 1.35rem; font-weight: 800; margin-bottom: 6px; line-height: 1.3; }
-/* 2번째 언어 (입력: 작게) */
-.box-bottom { color: #777; font-size: 0.95rem; font-weight: 400; }
+/* 언어 크기 차등 & 줄바꿈 적용 */
+.box-top { color: var(--gold); font-size: 1.35rem; font-weight: 800; margin-bottom: 6px; line-height: 1.4; white-space: pre-wrap; }
+.box-bottom { color: #777; font-size: 0.95rem; font-weight: 400; white-space: pre-wrap; }
 
-/* 분석창 모달 */
+/* 분석창 */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; z-index: 2000; }
 .modal-content { width: 85%; max-width: 400px; }
-
 .full-sentence-card { background: rgba(212, 175, 55, 0.05); border: 1px dashed var(--gold); border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 25px; }
 .full-target { font-size: 1.5rem; font-weight: 800; color: var(--gold); display: block; margin-bottom: 10px; }
 .full-origin { font-size: 1.1rem; color: #777; }
 
-/* 핵심 숙어 칩: 가로 흐름 */
+/* 덩어리 분석 칩 (가로 흐름) */
 .core-elements { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .core-chip { background: #222; border: 1px solid #333; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
 .chip-v { color: var(--gold); font-weight: 700; font-size: 1.1rem; }
-.chip-k { color: #fff; font-size: 0.9rem; opacity: 0.9; }
+.chip-k { color: #fff; font-size: 0.9rem; }
 
 footer { padding: 15px 20px 35px; display: flex; gap: 10px; background: #000; }
 .input-box { flex: 1; height: 54px; background: #151515; border: 1px solid #222; border-radius: 15px; color: #fff; padding: 0 15px; }
