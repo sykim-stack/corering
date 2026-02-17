@@ -33,3 +33,36 @@ footer { padding: 15px 20px 35px; display: flex; gap: 10px; background: #000; }
 .btn-send svg { fill: none; stroke: var(--gold); stroke-width: 3; opacity: 0.5; }
 .glow-active ~ footer .btn-send svg { opacity: 1; }
 .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--gold); color: #000; padding: 10px 20px; border-radius: 10px; font-weight: 800; z-index: 3000; }
+
+/* 분석 리스트: 가로로 촘촘하게 흐르는 격자 */
+.analysis-list { 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 8px; 
+    justify-content: center; 
+    padding: 10px 0;
+}
+
+/* 개별 단어 칩: 이미지의 느낌을 살린 컴팩트 디자인 */
+.analysis-card {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 8px 12px;
+    min-width: 70px;
+    text-align: center;
+}
+
+.card-main { display: flex; flex-direction: column; gap: 2px; }
+
+/* 위: 대상 언어 (강조) */
+.word-front { font-size: 1rem; font-weight: 800; color: var(--gold); }
+
+/* 아래: 대응하는 뜻 (보조) */
+.word-back { font-size: 0.8rem; color: #888; font-weight: 400; }
+
+/* 상하 세트 레이아웃 (정석) */
+.msg-pair { display: flex; flex-direction: column; align-self: flex-start; width: 85%; margin-bottom: 20px; cursor: pointer; }
+.box-top { background: #111; color: #fff; padding: 15px; border-radius: 15px 15px 0 0; border: 1px solid #222; font-size: 1rem; }
+.box-bottom { background: var(--gold); color: #000; padding: 15px; border-radius: 0 0 15px 15px; font-weight: 800; font-size: 1.1rem; }
+
