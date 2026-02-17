@@ -2,21 +2,19 @@ let CORE_DICTIONARY = [];
 const input = document.getElementById('userInput'), header = document.getElementById('header');
 const history = document.getElementById('chat-history'), modal = document.getElementById('modal-overlay');
 
-// 1. 사전 데이터 로드
 async function initEngine() {
     try {
         const res = await fetch('/api/get-sheet-dictionary'); 
         CORE_DICTIONARY = await res.json();
-    } catch (e) { console.error("DB 로드 실패"); }
+    } catch (e) { console.error("DB Load Failed"); }
 }
 initEngine();
 
-// 2. 심장 박동 트리거
+// 심장 박동 트리거
 input.addEventListener('input', () => {
     input.value.length > 0 ? header.classList.add('glow-active') : header.classList.remove('glow-active');
 });
 
-// 3. 번역 및 덩어리 분석
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
@@ -37,7 +35,7 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // 남부어 치환 로직
+        // 사전 데이터 매칭 (남부어 치환)
         CORE_DICTIONARY.forEach(item => {
             if (item.standard && result.includes(item.standard)) {
                 result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
@@ -46,7 +44,7 @@ async function handleSend() {
 
         document.getElementById(`t-${tempId}`).innerText = result;
 
-        // 덩어리 분석창
+        // 학습형 분석창
         pairDiv.onclick = () => {
             let coreHtml = '';
             CORE_DICTIONARY.forEach(item => {
@@ -54,12 +52,17 @@ async function handleSend() {
                     coreHtml += `<div class="core-chip"><span class="chip-v">${item.southern}</span><span class="chip-k">${item.meaning}</span></div>`;
                 }
             });
+            
             document.getElementById('modal-body').innerHTML = `
-                <div class="full-sentence-card"><span class="full-target">${result}</span><span class="full-origin">${text}</span></div>
+                <div class="study-card">
+                    <span class="study-v">${result}</span>
+                    <span class="study-k">${text}</span>
+                </div>
+                <div style="color:#333; font-size:0.7rem; text-align:center; margin-bottom:15px; letter-spacing:3px;">CORE CHUNKS</div>
                 <div class="core-elements">${coreHtml}</div>`;
             modal.style.display = 'flex';
         };
-    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "연결 오류"; }
+    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "ERROR"; }
 }
 
 document.getElementById('send-btn').onclick = handleSend;
