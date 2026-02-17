@@ -47,3 +47,35 @@ async function handleSend() {
 
 document.getElementById('send-btn').onclick = handleSend;
 input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
+
+// ... (위쪽 DICT 및 변수 설정은 동일)
+
+async function handleSend() {
+    // ... (입력값 처리 및 메시지 박스 생성 로직 동일)
+
+    try {
+        const target = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
+        const apiUrl = `/api/translate?text=${encodeURIComponent(text)}&target=${target}`;
+        
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        
+        // 데이터가 있는지 한 번 더 확인 (방어막)
+        if (data && data.translations && data.translations[0]) {
+            let result = data.translations[0].text;
+
+            if (target === 'VI') {
+                Object.keys(DICT).forEach(k => {
+                    result = result.replace(new RegExp(k, "gi"), DICT[k]);
+                });
+            }
+            document.getElementById(`t-${tempId}`).innerText = result;
+        } else {
+            throw new Error(data.error || "데이터 구조 오류");
+        }
+
+    } catch (e) {
+        document.getElementById(`t-${tempId}`).innerText = `엔진 오류: ${e.message}`;
+    }
+}
+
