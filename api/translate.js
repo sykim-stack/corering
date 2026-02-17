@@ -1,7 +1,5 @@
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    if (req.method === 'OPTIONS') return res.status(200).end();
-
     const { text, target } = req.query;
     const KEY = 'b7d91801-1316-448a-9896-dea29a271183:fx';
 
@@ -19,6 +17,6 @@ export default async function handler(req, res) {
         const data = await response.json();
         return res.status(200).json(data);
     } catch (error) {
-        return res.status(500).json({ error: 'DeepL 통신 실패' });
+        return res.status(500).json({ error: '통신 실패' });
     }
 }
