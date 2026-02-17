@@ -1,53 +1,40 @@
-/* 하단 폼: 이전 스타일로 롤백 및 버튼 일체화 */
-footer { 
-    padding: 15px 20px 35px; 
-    background: #000; 
-    display: flex; 
-    gap: 10px; 
-}
+:root { --gold: #D4AF37; --bg: #000; --white: #fff; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--white); margin: 0; font-family: sans-serif; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-.input-box { 
-    flex: 1; 
-    height: 54px; 
-    background: #151515; /* 다시 어두운 회색으로 */
-    border: 1px solid #222; /* 얇은 테두리 */
-    border-radius: 15px; 
-    color: #fff; 
-    padding: 0 18px; 
-    font-size: 1rem;
-    outline: none;
-    transition: 0.3s;
-}
+header { padding: 20px 25px; border-bottom: 1px solid #1a1a1a; }
+.header-top { display: flex; justify-content: space-between; align-items: center; }
+.logo-area { font-weight: 900; font-size: 1.8rem; display: flex; align-items: baseline; }
+.logo-core { color: #444; letter-spacing: -1.5px; }
+.logo-ring { color: #fff; margin-left: 2px; }
 
-/* 포커스 시에만 폼과 버튼이 같은 색상으로 연결됨 */
-.input-box:focus { 
-    border-color: var(--gold); 
-}
+.btn-coffee { color: var(--gold); }
+.btn-coffee svg { fill: none; stroke: currentColor; stroke-width: 2; }
 
-.btn-send { 
-    width: 54px; 
-    height: 54px; 
-    background: #151515; /* 폼과 같은 배경색 */
-    border: 1px solid #222; /* 폼과 같은 테두리 */
-    border-radius: 15px; 
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: 0.3s;
-}
+.morse-r { margin-top: 5px; display: flex; gap: 5px; padding-left: 80px; }
+.m-dot, .m-dash { background: var(--gold); height: 4px; border-radius: 2px; }
+.m-dot { width: 4px; } .m-dash { width: 16px; }
 
-/* 입력창에 포커스 가거나 글자 있으면 버튼도 노란색 포인트 */
-.input-box:focus + .btn-send,
-.btn-send:hover {
-    border-color: var(--gold);
-}
+@keyframes morseBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.glow-active .m-dot, .glow-active .m-dash { animation: morseBlink 0.6s infinite; }
 
-/* 체크 아이콘 색상 */
-.btn-send svg {
-    fill: none;
-    stroke: var(--gold); /* 체크 아이콘은 노란색 */
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
+main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.msg-box { position: relative; width: 80%; padding: 18px; border-radius: 18px; cursor: pointer; transition: 0.2s; }
+.msg-box:active { transform: scale(0.98); }
+.msg-left { align-self: flex-start; background: #111; border-left: 3px solid var(--gold); border-bottom-left-radius: 4px; }
+.msg-right { align-self: flex-end; background: var(--gold); color: #000; text-align: right; border-bottom-right-radius: 4px; }
+
+.trans-text { font-size: 1.2rem; font-weight: 700; }
+.origin-text { font-size: 0.85rem; margin-top: 6px; opacity: 0.6; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.modal-content { background: #111; border: 1px solid var(--gold); width: 100%; max-width: 400px; border-radius: 20px; padding: 25px; }
+#modal-title { color: var(--gold); font-weight: 900; }
+#modal-close { background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; }
+.analysis-unit { margin-top: 20px; line-height: 1.6; }
+
+footer { padding: 15px 20px 35px; display: flex; gap: 10px; }
+.input-box { flex: 1; height: 54px; background: #151515; border: 1px solid #222; border-radius: 15px; color: #fff; padding: 0 15px; outline: none; }
+.input-box:focus { border-color: var(--gold); }
+.btn-send { width: 54px; height: 54px; background: #151515; border: 1px solid #222; border-radius: 15px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.btn-send svg { fill: none; stroke: var(--gold); stroke-width: 3; }
