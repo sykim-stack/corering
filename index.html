@@ -4,88 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CORE-RING ENGINE</title>
-    <style>
-        :root { --pure-white: #ffffff; --gold: #D4AF37; --dark-bg: #000; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        body { background: var(--dark-bg); color: var(--pure-white); font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; margin: 0; }
-        header { position: fixed; top: 0; left: 0; width: 100%; height: 85px; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); display: flex; flex-direction: column; justify-content: center; padding: 0 25px; z-index: 1000; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .logo-area { display: flex; align-items: baseline; }
-        .logo-core { color: #fff; font-weight: 900; font-size: 1.8rem; letter-spacing: -1.5px; opacity: 0.15; }
-        .logo-ring { color: var(--pure-white); font-weight: 200; font-size: 1.8rem; margin-left: 2px; }
-        .morse-r { margin-top: 4px; margin-left: 66px; display: flex; gap: 4px; align-items: center; }
-        .m-dot { width: 4px; height: 4px; background: var(--gold); border-radius: 50%; opacity: 0.2; }
-        .m-dash { width: 12px; height: 4px; background: var(--gold); border-radius: 2px; opacity: 0.2; }
-        .glow-active .m-dot, .glow-active .m-dash { opacity: 1; box-shadow: 0 0 10px var(--gold); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        main { height: 100vh; overflow-y: auto; padding: 110px 20px 150px; display: flex; flex-direction: column; gap: 20px; }
-        .msg-box { max-width: 92%; padding: 22px; border-radius: 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
-        .trans-text { font-size: 22px; font-weight: 800; color: var(--pure-white); line-height: 1.4; }
-        .origin-text { font-size: 0.95rem; color: rgba(255,255,255,0.3); margin-top: 8px; }
-        footer { position: fixed; bottom: 0; width: 100%; padding: 20px 20px 45px; background: #000; z-index: 1000; display: flex; gap: 12px; }
-        .input-box { flex: 1; height: 56px; background: #151515; border: 1px solid #222; border-radius: 18px; color: #fff; padding: 0 22px; font-size: 1.1rem; }
-        .btn-send { width: 56px; height: 56px; background: var(--gold); border: none; border-radius: 18px; display: flex; align-items: center; justify-content: center; }
-    </style>
-</head>
+    <link rel="stylesheet" href="style.css"> </head>
 <body>
     <header id="header">
         <div class="logo-area"><span class="logo-core">CORE</span><span class="logo-ring">RING</span></div>
         <div class="morse-r"><div class="m-dot"></div><div class="m-dash"></div><div class="m-dot"></div></div>
     </header>
+
     <main id="chat-history"></main>
+
     <footer>
         <input type="text" id="userInput" class="input-box" placeholder="심장을 깨우는 한마디..." autocomplete="off">
         <button id="send-btn" class="btn-send">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
         </button>
     </footer>
-    <script>
-        const CONFIG = { DEEPL_KEY: 'b7d91801-1316-448a-9896-dea29a271183:fx' };
-        const SOUTHERN_DICT = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "vô" };
-        const input = document.getElementById('userInput');
-        const header = document.getElementById('header');
-        const history = document.getElementById('chat-history');
 
-        input.oninput = () => { if(input.value.length > 0) header.classList.add('glow-active'); else header.classList.remove('glow-active'); };
-
-        async function handleSend() {
-            const text = input.value.trim();
-            if (!text) return;
-            input.value = '';
-            header.classList.remove('glow-active');
-
-            const tempId = Date.now();
-            const div = document.createElement('div');
-            div.className = 'msg-box';
-            div.innerHTML = `<div class="trans-text" id="t-${tempId}">...</div><div class="origin-text">${text}</div>`;
-            history.appendChild(div);
-            history.scrollTop = history.scrollHeight;
-
-            try {
-                const targetLang = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
-                // Vercel(HTTPS) 환경에서는 이 표준 호출이 가장 잘 먹힙니다.
-                const res = await fetch('https://api-free.deepl.com/v2/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        auth_key: CONFIG.DEEPL_KEY,
-                        text: text,
-                        target_lang: targetLang
-                    })
-                });
-                const data = await res.json();
-                let result = data.translations[0].text;
-                if (targetLang === 'VI') {
-                    Object.keys(SOUTHERN_DICT).forEach(key => {
-                        result = result.replace(new RegExp(key, "gi"), SOUTHERN_DICT[key]);
-                    });
-                }
-                document.getElementById(`t-${tempId}`).innerText = result;
-            } catch (e) {
-                document.getElementById(`t-${tempId}`).innerText = "[엔진 연결 확인 중...]";
-            }
-        }
-        document.getElementById('send-btn').onclick = handleSend;
-        input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
-    </script>
-</body>
+    <script src="engine.js"></script> </body>
 </html>
