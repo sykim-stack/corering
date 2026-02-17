@@ -10,14 +10,14 @@ async function handleSend() {
     const tempId = Date.now();
     const div = document.createElement('div');
     div.className = 'msg-box';
-    div.innerHTML = `<div class="trans-text" id="t-${tempId}">서버 우회 중...</div><div class="origin-text">${text}</div>`;
+    div.innerHTML = `<div class="trans-text" id="t-${tempId}">지하 터널 통과 중...</div><div class="origin-text">${text}</div>`;
     history.appendChild(div);
     history.scrollTop = history.scrollHeight;
 
     try {
         const target = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
         
-        // 브라우저가 직접 가지 않고, 우리가 만든 /api/translate로 요청을 보냅니다.
+        // 이제 DeepL 주소가 아니라, 우리가 만든 내부 API 경로(/api/translate)로 보냅니다.
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
         
@@ -30,7 +30,7 @@ async function handleSend() {
         }
         document.getElementById(`t-${tempId}`).innerText = result;
     } catch (e) {
-        document.getElementById(`t-${tempId}`).innerText = "엔진 심장부 오류 (Vercel 설정 확인)";
+        document.getElementById(`t-${tempId}`).innerText = "터널 붕괴: 서버 설정을 확인하세요.";
     }
 }
 
