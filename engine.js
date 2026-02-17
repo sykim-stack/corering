@@ -1,3 +1,21 @@
+let CORE_DICTIONARY = [];
+
+// [DB 연결] 사전시트 데이터 500개 동기화
+async function initEngine() {
+    try {
+        const res = await fetch('/api/get-sheet-dictionary'); 
+        CORE_DICTIONARY = await res.json(); 
+        console.log("🚀 CORE-RING 엔진 가동: 500개 덩어리 사전 탑재");
+    } catch (e) { 
+        console.error("데이터 로드 실패");
+        CORE_DICTIONARY = []; 
+    }
+}
+initEngine();
+
+const input = document.getElementById('userInput'), history = document.getElementById('chat-history');
+const modal = document.getElementById('modal-overlay'), modalBody = document.getElementById('modal-body');
+
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
@@ -7,15 +25,9 @@ async function handleSend() {
     const tempId = Date.now();
     const pairDiv = document.createElement('div');
 
-    // [정석] 입력 언어에 따라 좌우 배치 및 상하 크기 차등
+    // [정석 배치] 좌우 80% 고정 & 말풍선 클래스
     pairDiv.className = isKorean ? 'msg-pair pair-left' : 'msg-pair pair-right';
-    
-    // 한국어 입력 시: 위(베트남어-크게), 아래(한국어-작게)
-    // 베트남어 입력 시: 위(한국어-크게), 아래(베트남어-작게)
-    pairDiv.innerHTML = `
-        <div class="box-top" id="t-${tempId}">...</div>
-        <div class="box-bottom">${text}</div>
-    `;
+    pairDiv.innerHTML = `<div class="box-top" id="t-${tempId}">...</div><div class="box-bottom">${text}</div>`;
     
     history.appendChild(pairDiv);
     pairDiv.scrollIntoView({ behavior: 'smooth' });
@@ -26,7 +38,7 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // 사전시트 남부어 치환 (500개 DB 활용)
+        // [사전시트 기반 남부어 강제 치환]
         CORE_DICTIONARY.forEach(item => {
             if (item.standard && result.includes(item.standard)) {
                 result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
@@ -36,11 +48,10 @@ async function handleSend() {
         const finalResult = result;
         document.getElementById(`t-${tempId}`).innerText = finalResult;
 
-        // [분석창 로직] 단어 쪼개기 금지 -> 의미 있는 덩어리 매칭
+        // [분석창 로직] 낱단어 쪼개기 삭제 -> 의미 있는 덩어리(Chunk) 매칭
         pairDiv.onclick = () => {
             let coreHtml = '';
-            
-            // 1. 먼저 DB에서 숙어가 있는지 검색 (가장 중요한 덩어리)
+            // 문장 전체에서 DB 숙어가 포함되어 있는지 덩어리로 검색
             CORE_DICTIONARY.forEach(item => {
                 if (finalResult.includes(item.southern)) {
                     coreHtml += `
@@ -51,17 +62,21 @@ async function handleSend() {
                 }
             });
 
-            // 2. 만약 DB에 없는 일반 문장이라면 전체 대조만 깔끔하게
             modalBody.innerHTML = `
                 <div class="full-sentence-card">
                     <span class="full-target">${finalResult}</span>
-                    <span class="full-origin" style="font-size:1rem; opacity:0.6;">${text}</span>
+                    <span class="full-origin">${text}</span>
                 </div>
                 <div class="core-elements">
-                    ${coreHtml || '<p style="color:#555">통문장 분석 완료</p>'}
+                    ${coreHtml || '<p style="color:#555; font-size:0.9rem;">문맥 기반 실전 번역입니다.</p>'}
                 </div>
             `;
             modal.style.display = 'flex';
         };
-    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "오류"; }
+    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "연결 오류"; }
 }
+
+document.getElementById('send-btn').onclick = handleSend;
+input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
+document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if(e.target == modal) modal.style.display = 'none'; };
