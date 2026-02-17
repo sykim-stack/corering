@@ -1,29 +1,22 @@
-const input = document.getElementById('userInput'), history = document.getElementById('chat-history');
-const header = document.getElementById('header'), modal = document.getElementById('modal-overlay');
-
-input.addEventListener('input', () => {
-    input.value.length > 0 ? header.classList.add('glow-active') : header.classList.remove('glow-active');
-});
-
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
-    header.classList.remove('glow-active');
 
-    const tempId = Date.now();
     const isKorean = /[ㄱ-ㅎ|가-힣]/.test(text);
+    const tempId = Date.now();
     const pairDiv = document.createElement('div');
 
-    // [정석 배치 판정] 한국어면 왼쪽 세트, 베트남어면 오른쪽 세트
-    if (isKorean) {
-        pairDiv.className = 'msg-pair pair-left';
-        pairDiv.innerHTML = `<div class="box-top" id="t-${tempId}">...</div><div class="box-bottom">${text}</div>`;
-    } else {
-        pairDiv.className = 'msg-pair pair-right';
-        pairDiv.innerHTML = `<div class="box-top" id="t-${tempId}">...</div><div class="box-bottom">${text}</div>`;
-    }
-
+    // [정석] 입력 언어에 따라 좌우 배치 및 상하 크기 차등
+    pairDiv.className = isKorean ? 'msg-pair pair-left' : 'msg-pair pair-right';
+    
+    // 한국어 입력 시: 위(베트남어-크게), 아래(한국어-작게)
+    // 베트남어 입력 시: 위(한국어-크게), 아래(베트남어-작게)
+    pairDiv.innerHTML = `
+        <div class="box-top" id="t-${tempId}">...</div>
+        <div class="box-bottom">${text}</div>
+    `;
+    
     history.appendChild(pairDiv);
     pairDiv.scrollIntoView({ behavior: 'smooth' });
 
@@ -33,37 +26,42 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        if (target === 'VI') {
-            const DICT = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "vô" };
-            Object.keys(DICT).forEach(k => { result = result.replace(new RegExp(k, "gi"), DICT[k]); });
-        }
-        
+        // 사전시트 남부어 치환 (500개 DB 활용)
+        CORE_DICTIONARY.forEach(item => {
+            if (item.standard && result.includes(item.standard)) {
+                result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
+            }
+        });
+
         const finalResult = result;
         document.getElementById(`t-${tempId}`).innerText = finalResult;
 
+        // [분석창 로직] 단어 쪼개기 금지 -> 의미 있는 덩어리 매칭
         pairDiv.onclick = () => {
-            const oriWords = text.split(/\s+/), transWords = finalResult.split(/\s+/);
-            let html = '<div class="analysis-list">';
-            const max = Math.max(oriWords.length, transWords.length);
-            for(let i=0; i<max; i++) {
-                const o = oriWords[i] ? oriWords[i].replace(/[.,!?]/g, '') : "";
-                const t = transWords[i] ? transWords[i].replace(/[.,!?]/g, '') : "";
-                if(!o && !t) continue;
-                html += `<div class="analysis-card"><div class="card-main"><span class="word-front">${t}</span><span class="word-back">${o}</span></div></div>`;
-            }
-            document.getElementById('modal-body').innerHTML = html;
+            let coreHtml = '';
+            
+            // 1. 먼저 DB에서 숙어가 있는지 검색 (가장 중요한 덩어리)
+            CORE_DICTIONARY.forEach(item => {
+                if (finalResult.includes(item.southern)) {
+                    coreHtml += `
+                        <div class="core-chip">
+                            <span class="chip-v">${item.southern}</span>
+                            <span class="chip-k">${item.meaning}</span>
+                        </div>`;
+                }
+            });
+
+            // 2. 만약 DB에 없는 일반 문장이라면 전체 대조만 깔끔하게
+            modalBody.innerHTML = `
+                <div class="full-sentence-card">
+                    <span class="full-target">${finalResult}</span>
+                    <span class="full-origin" style="font-size:1rem; opacity:0.6;">${text}</span>
+                </div>
+                <div class="core-elements">
+                    ${coreHtml || '<p style="color:#555">통문장 분석 완료</p>'}
+                </div>
+            `;
             modal.style.display = 'flex';
         };
     } catch (e) { document.getElementById(`t-${tempId}`).innerText = "오류"; }
 }
-
-document.getElementById('send-btn').onclick = handleSend;
-input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
-document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
-document.getElementById('share-btn').onclick = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-        const toast = document.createElement('div');
-        toast.className = 'toast'; toast.innerText = 'URL 복사 완료!';
-        document.body.appendChild(toast); setTimeout(() => toast.remove(), 2000);
-    });
-};
