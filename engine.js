@@ -11,6 +11,7 @@ input.oninput = () => {
     else header.classList.remove('glow-active');
 };
 
+// engine.js 내의 handleSend 함수 중 일부만 수정하세요
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
@@ -19,10 +20,18 @@ async function handleSend() {
     header.classList.remove('glow-active');
 
     const tempId = Date.now();
+    const isKorean = /[ㄱ-ㅎ|가-힣]/.test(text);
+    
+    // 한국어면 왼쪽(Left), 베트남어면 오른쪽(Right) 배치
+    const boxClass = isKorean ? 'msg-left' : 'msg-right';
+    
     const div = document.createElement('div');
-    div.className = 'msg-box';
-    div.innerHTML = `<div class="trans-text" id="t-${tempId}">분석 중...</div><div class="origin-text">${text}</div>`;
+    div.className = `msg-box ${boxClass}`;
+    div.innerHTML = `<div class="trans-text" id="t-${tempId}">...</div><div class="origin-text">${text}</div>`;
     history.appendChild(div);
+    
+    // ... 후략 (fetch 로직은 동일)
+
     
     // 자동 스크롤
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -63,4 +72,5 @@ sendBtn.onclick = (e) => {
 input.onkeypress = (e) => {
     if (e.key === 'Enter') handleSend();
 };
+
 
