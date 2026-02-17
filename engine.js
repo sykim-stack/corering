@@ -27,36 +27,31 @@ async function handleSend() {
     // 자동 스크롤
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
+// ... (위쪽 코드는 동일하게 유지하시고 try-catch 부분만 확인하세요)
+
     try {
         const target = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
-        
-        // Vercel 서버리스 함수 호출
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
-        
-        if (!res.ok) {
-            const errorInfo = await res.json();
-            throw new Error(errorInfo.error || '서버 응답 불안정');
-        }
-
         const data = await res.json();
         
-        if (data.translations && data.translations[0]) {
+        if (res.ok && data.translations) {
             let result = data.translations[0].text;
 
-            // 사장님의 코어 로직: 남부 방언 치환
+            // 사장님의 남부 방언 필터
             if (target === 'VI') {
                 Object.keys(DICT).forEach(k => {
-                    const regex = new RegExp(k, "gi");
-                    result = result.replace(regex, DICT[k]);
+                    result = result.replace(new RegExp(k, "gi"), DICT[k]);
                 });
             }
             document.getElementById(`t-${tempId}`).innerText = result;
         } else {
-            throw new Error('데이터 구조 불일치');
+            // 여기서 DeepL이 보낸 진짜 에러(키 오류, 한도 초과 등)를 보여줍니다.
+            throw new Error(data.details || data.error || '알 수 없는 응답');
         }
     } catch (e) {
         document.getElementById(`t-${tempId}`).innerText = "엔진 오류: " + e.message;
     }
+// ...
 }
 
 // 이벤트 연결
@@ -68,3 +63,4 @@ sendBtn.onclick = (e) => {
 input.onkeypress = (e) => {
     if (e.key === 'Enter') handleSend();
 };
+
