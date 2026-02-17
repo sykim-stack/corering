@@ -35,7 +35,7 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // 사전 데이터 매칭 (남부어 치환)
+        // 남부어 치환
         CORE_DICTIONARY.forEach(item => {
             if (item.standard && result.includes(item.standard)) {
                 result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
@@ -44,22 +44,28 @@ async function handleSend() {
 
         document.getElementById(`t-${tempId}`).innerText = result;
 
-        // 학습형 분석창
+        // [학습 카드 생성] 사장님이 10번 넘게 말씀하신 그 UI
         pairDiv.onclick = () => {
-            let coreHtml = '';
+            let chunkHtml = '';
             CORE_DICTIONARY.forEach(item => {
                 if (result.includes(item.southern)) {
-                    coreHtml += `<div class="core-chip"><span class="chip-v">${item.southern}</span><span class="chip-k">${item.meaning}</span></div>`;
+                    chunkHtml += `
+                        <div class="chunk-card">
+                            <span class="chunk-v">${item.southern}</span>
+                            <span class="chunk-k">${item.meaning}</span>
+                        </div>`;
                 }
             });
             
             document.getElementById('modal-body').innerHTML = `
-                <div class="study-card">
-                    <span class="study-v">${result}</span>
-                    <span class="study-k">${text}</span>
+                <div>
+                    <div style="font-size:1.5rem; font-weight:800; color:#fff; margin-bottom:5px;">${result}</div>
+                    <div style="font-size:1.1rem; color:#666;">${text}</div>
                 </div>
-                <div style="color:#333; font-size:0.7rem; text-align:center; margin-bottom:15px; letter-spacing:3px;">CORE CHUNKS</div>
-                <div class="core-elements">${coreHtml}</div>`;
+                <div style="height:1px; background:#222; margin:20px 0;"></div>
+                <div class="chunk-grid">
+                    ${chunkHtml || '<div style="color:#444; grid-column:span 2; text-align:center;">의미 덩어리 분석 중...</div>'}
+                </div>`;
             modal.style.display = 'flex';
         };
     } catch (e) { document.getElementById(`t-${tempId}`).innerText = "ERROR"; }
