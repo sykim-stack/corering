@@ -1,76 +1,58 @@
 const DICT = { "ngô": "bắp", "thìa": "muỗng", "bố": "ba", "rượu": "vô" };
-
 const input = document.getElementById('userInput');
-const sendBtn = document.getElementById('send-btn');
 const history = document.getElementById('chat-history');
 const header = document.getElementById('header');
+const modal = document.getElementById('modal-overlay');
 
-// 입력창 모스부호 애니메이션
-input.oninput = () => {
-    if(input.value.length > 0) header.classList.add('glow-active');
-    else header.classList.remove('glow-active');
-};
+input.addEventListener('input', () => {
+    input.value.length > 0 ? header.classList.add('glow-active') : header.classList.remove('glow-active');
+});
 
-// engine.js 내의 handleSend 함수 중 일부만 수정하세요
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
-    
     input.value = '';
     header.classList.remove('glow-active');
 
-    const tempId = Date.now();
     const isKorean = /[ㄱ-ㅎ|가-힣]/.test(text);
-    
-    // 한국어면 왼쪽(Left), 베트남어면 오른쪽(Right) 배치
     const boxClass = isKorean ? 'msg-left' : 'msg-right';
-    
+    const tempId = Date.now();
+
     const div = document.createElement('div');
     div.className = `msg-box ${boxClass}`;
     div.innerHTML = `<div class="trans-text" id="t-${tempId}">...</div><div class="origin-text">${text}</div>`;
     history.appendChild(div);
-    
-    // ... 후략 (fetch 로직은 동일)
-
-    
-    // 자동 스크롤
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-
-// ... (위쪽 코드는 동일하게 유지하시고 try-catch 부분만 확인하세요)
+    div.scrollIntoView({ behavior: 'smooth' });
 
     try {
-        const target = /[ㄱ-ㅎ|가-힣]/.test(text) ? 'VI' : 'KO';
+        const target = isKorean ? 'VI' : 'KO';
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
-        
-        if (res.ok && data.translations) {
-            let result = data.translations[0].text;
+        let result = data.translations[0].text;
 
-            // 사장님의 남부 방언 필터
-            if (target === 'VI') {
-                Object.keys(DICT).forEach(k => {
-                    result = result.replace(new RegExp(k, "gi"), DICT[k]);
-                });
-            }
-            document.getElementById(`t-${tempId}`).innerText = result;
-        } else {
-            // 여기서 DeepL이 보낸 진짜 에러(키 오류, 한도 초과 등)를 보여줍니다.
-            throw new Error(data.details || data.error || '알 수 없는 응답');
+        if (target === 'VI') {
+            Object.keys(DICT).forEach(k => { result = result.replace(new RegExp(k, "gi"), DICT[k]); });
         }
-    } catch (e) {
-        document.getElementById(`t-${tempId}`).innerText = "엔진 오류: " + e.message;
-    }
-// ...
+        
+        const finalResult = result;
+        document.getElementById(`t-${tempId}`).innerText = finalResult;
+        
+        // 클릭 시 모달 오픈
+        div.onclick = () => {
+            document.getElementById('modal-body').innerHTML = `
+                <div class="analysis-unit">
+                    <div style="color:var(--gold); font-size:1.2rem; font-weight:800;">${finalResult}</div>
+                    <div style="font-size:0.9rem; margin-top:10px; color:#888;">
+                        원문: ${text}<br><br>
+                        CORE-RING 시스템이 문맥을 분석하여 최적의 단어를 선택했습니다. 베트남 남부 방언 필터가 적용된 결과입니다.
+                    </div>
+                </div>`;
+            modal.style.display = 'flex';
+        };
+    } catch (e) { document.getElementById(`t-${tempId}`).innerText = "오류 발생"; }
 }
 
-// 이벤트 연결
-sendBtn.onclick = (e) => {
-    e.preventDefault();
-    handleSend();
-};
-
-input.onkeypress = (e) => {
-    if (e.key === 'Enter') handleSend();
-};
-
-
+document.getElementById('send-btn').onclick = handleSend;
+input.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
+document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if(e.target == modal) modal.style.display = 'none'; };
