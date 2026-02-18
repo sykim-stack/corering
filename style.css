@@ -61,8 +61,8 @@ header {
     border-radius: 2px;
     transition: 0.3s;
 }
-.m-dot { width: 4px; }
-.m-dash { width: 14px; }
+.m-dot { width: 3px; }
+.m-dash { width: 13px; }
 
 /* 심장 박동 */
 @keyframes heartBeat {
@@ -328,4 +328,5 @@ footer {
     border-radius: 28px !important;
     max-height: 85vh;
 }
+
 
