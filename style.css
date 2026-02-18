@@ -299,3 +299,16 @@ footer {
     background: #1a1a1a;
     border-color: #444;
 }
+/* pair-right (베트남어 입력) - 흰색 카드 */
+.pair-right {
+    background: #ffffff;
+    border-color: #e0e0e0;
+}
+
+.pair-right .box-top {
+    color: #000000;
+}
+
+.pair-right .box-bottom {
+    color: #666666;
+}
