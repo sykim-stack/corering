@@ -25,7 +25,6 @@ input.addEventListener('input', () => {
 async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
-
     input.value = '';
     header.classList.remove('glow-active');
 
@@ -48,8 +47,16 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // 남부어 치환
-        CORE_DICTIONARY.forEach(item => {
+        // 남부어 치환: 숙어 먼저 → 단어 나중
+        const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
+        const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
+
+        idioms.forEach(item => {
+            if (item.standard && result.includes(item.standard)) {
+                result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
+            }
+        });
+        words.forEach(item => {
             if (item.standard && result.includes(item.standard)) {
                 result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
             }
@@ -59,7 +66,6 @@ async function handleSend() {
 
         // 카드 클릭 → 학습 모달
         pairDiv.onclick = () => showModal(text, result, isKorean);
-
     } catch (e) {
         document.getElementById(`t-${tempId}`).innerText = "번역 오류";
         console.error(e);
@@ -67,25 +73,40 @@ async function handleSend() {
 }
 
 function showModal(original, translated, isKorean) {
-    // 단어 카드 생성: 사전 매칭 + 폴백으로 단어 분리
     let chunkHtml = '';
+    let matched = new Set();
 
-    // 1차: 사전 매칭
-    CORE_DICTIONARY.forEach(item => {
+    // 1차: 숙어 매칭 (우선)
+    const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
+    idioms.forEach(item => {
         if (item.southern && translated.includes(item.southern)) {
+            chunkHtml += `
+                <div class="chunk-card">
+                    <span class="chunk-v">${item.southern}</span>
+                    <span class="chunk-k">${item.meaning || ''}</span>
+                </div>`;
+            matched.add(item.southern);
+        }
+    });
+
+    // 2차: 단어 사전 매칭
+    const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
+    words.forEach(item => {
+        if (item.southern && translated.includes(item.southern) && !matched.has(item.southern)) {
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${item.southern}</span>
                     <span class="chunk-k">${item.meaning || item.standard || ''}</span>
                 </div>`;
+            matched.add(item.southern);
         }
     });
 
-    // 2차 폴백: 사전 매칭 없으면 공백 기준으로 단어 분리
+    // 3차 폴백: 사전 매칭 없으면 공백 기준 분리
     if (!chunkHtml) {
-        const words = translated.split(/\s+/).filter(w => w.length > 1);
+        const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
         const origWords = original.split(/\s+/).filter(w => w.length > 0);
-        words.forEach((word, i) => {
+        splitWords.forEach((word, i) => {
             const pair = origWords[i] || '';
             chunkHtml += `
                 <div class="chunk-card">
@@ -102,7 +123,6 @@ function showModal(original, translated, isKorean) {
         </div>
         <div class="modal-divider"></div>
         <div class="chunk-grid">${chunkHtml}</div>`;
-
     modal.style.display = 'flex';
 }
 
