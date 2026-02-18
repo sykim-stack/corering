@@ -42,7 +42,7 @@ header {
     font-weight: 900;
     font-size: 1.4em;
     letter-spacing: -1px;
-    line-height: 16;
+    line-height: 1;
 }
 
 .logo-core { color: var(--core-dark); }
@@ -328,6 +328,7 @@ footer {
     border-radius: 28px !important;
     max-height: 85vh;
 }
+
 
 
 
