@@ -58,27 +58,36 @@ async function handleSend() {
         const target = isKorean ? 'VI' : 'KO';
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
-        let result = data.translations[0].text;
+        let standardResult = data.translations[0].text;
+        let southernResult = standardResult;
+        let isSouthern = false;
 
+        // 남부어 치환: 숙어 먼저 → 단어 나중
         const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
         const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
 
         idioms.forEach(item => {
-            if (item.standard && result.includes(item.standard)) {
-                result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
+            if (item.standard && southernResult.includes(item.standard)) {
+                southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
+                isSouthern = true;
             }
         });
         words.forEach(item => {
-            if (item.standard && result.includes(item.standard)) {
-                result = result.replace(new RegExp(item.standard, 'gi'), item.southern);
+            if (item.standard && southernResult.includes(item.standard)) {
+                southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
+                isSouthern = true;
             }
         });
 
-        document.getElementById(`t-${tempId}`).innerText = result;
+        document.getElementById(`t-${tempId}`).innerText = southernResult;
 
+        // CORELINK 전송 - 남부어 치환 정보 포함
         trackEvent('translate', {
             input: text,
-            output: result,
+            output: southernResult,
+            standard_vi: standardResult,
+            southern_vi: isSouthern ? southernResult : null,
+            is_southern: isSouthern,
             direction: isKorean ? 'KO→VI' : 'VI→KO',
             timestamp: Date.now()
         });
@@ -86,10 +95,10 @@ async function handleSend() {
         pairDiv.onclick = () => {
             trackEvent('card_click', {
                 input: text,
-                output: result,
+                output: southernResult,
                 timestamp: Date.now()
             });
-            showModal(text, result, isKorean);
+            showModal(text, southernResult, isKorean);
         };
 
     } catch (e) {
