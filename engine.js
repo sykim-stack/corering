@@ -3,6 +3,7 @@ const input = document.getElementById('userInput');
 const header = document.getElementById('header');
 const history = document.getElementById('chat-history');
 const modal = document.getElementById('modal-overlay');
+let msgCount = 0; // 메시지 순서 카운트
 
 async function initEngine() {
     try {
@@ -15,7 +16,6 @@ async function initEngine() {
 }
 initEngine();
 
-// ── CORELINK 행동 수집 ──
 function trackEvent(type, data) {
     const payload = { type, ...data };
     const session = JSON.parse(sessionStorage.getItem('core_session') || '[]');
@@ -28,7 +28,6 @@ function trackEvent(type, data) {
     }).catch(() => {});
 }
 
-// 심장 박동 트리거
 input.addEventListener('input', () => {
     input.value.length > 0
         ? header.classList.add('glow-active')
@@ -43,14 +42,19 @@ async function handleSend() {
 
     const isKorean = /[ㄱ-ㅎ|가-힣]/.test(text);
     const tempId = Date.now();
+    msgCount++;
+
+    // 순서 기반 좌우 결정 (홀수=왼쪽, 짝수=오른쪽)
+    const isLeft = msgCount % 2 === 1;
 
     const pairDiv = document.createElement('div');
-    pairDiv.className = isKorean ? 'msg-pair pair-left' : 'msg-pair pair-right';
+    pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
     pairDiv.innerHTML = `
         <div class="box-top" id="t-${tempId}">
             <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>
         </div>
         <div class="box-bottom">${text}</div>`;
+
     history.appendChild(pairDiv);
     pairDiv.scrollIntoView({ behavior: 'smooth' });
 
@@ -62,7 +66,6 @@ async function handleSend() {
         let southernResult = standardResult;
         let isSouthern = false;
 
-        // 남부어 치환: 숙어 먼저 → 단어 나중
         const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
         const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
 
@@ -81,7 +84,6 @@ async function handleSend() {
 
         document.getElementById(`t-${tempId}`).innerText = southernResult;
 
-        // CORELINK 전송 - 남부어 치환 정보 포함
         trackEvent('translate', {
             input: text,
             output: southernResult,
@@ -93,11 +95,7 @@ async function handleSend() {
         });
 
         pairDiv.onclick = () => {
-            trackEvent('card_click', {
-                input: text,
-                output: southernResult,
-                timestamp: Date.now()
-            });
+            trackEvent('card_click', { input: text, output: southernResult, timestamp: Date.now() });
             showModal(text, southernResult, isKorean);
         };
 
@@ -139,20 +137,15 @@ function showModal(original, translated, isKorean) {
         const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
         const origWords = original.split(/\s+/).filter(w => w.length > 0);
         splitWords.forEach((word, i) => {
-            const pair = origWords[i] || '';
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${word}</span>
-                    <span class="chunk-k">${pair}</span>
+                    <span class="chunk-k">${origWords[i] || ''}</span>
                 </div>`;
         });
     }
 
-    trackEvent('modal_open', {
-        original,
-        translated,
-        timestamp: Date.now()
-    });
+    trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
     document.getElementById('modal-body').innerHTML = `
         <div class="modal-header-text">
