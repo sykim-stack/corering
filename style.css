@@ -319,3 +319,12 @@ footer {
     font-style: italic;
 }
 
+/* 모달 중앙 정렬 */
+.modal-overlay {
+    align-items: center !important;
+}
+
+.modal-content {
+    border-radius: 28px !important;
+    max-height: 85vh;
+}
