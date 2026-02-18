@@ -303,6 +303,7 @@ footer {
 .pair-right {
     background: #ffffff;
     border-color: #e0e0e0;
+    text-align: right;
 }
 
 .pair-right .box-top {
@@ -312,3 +313,4 @@ footer {
 .pair-right .box-bottom {
     color: #666666;
 }
+
