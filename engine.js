@@ -15,6 +15,19 @@ async function initEngine() {
 }
 initEngine();
 
+// ── CORELINK 행동 수집 ──
+function trackEvent(type, data) {
+    const payload = { type, ...data };
+    const session = JSON.parse(sessionStorage.getItem('core_session') || '[]');
+    session.push(payload);
+    sessionStorage.setItem('core_session', JSON.stringify(session));
+    fetch('/api/corelink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(() => {});
+}
+
 // 심장 박동 트리거
 input.addEventListener('input', () => {
     input.value.length > 0
@@ -47,7 +60,6 @@ async function handleSend() {
         const data = await res.json();
         let result = data.translations[0].text;
 
-        // 남부어 치환: 숙어 먼저 → 단어 나중
         const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
         const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
 
@@ -64,8 +76,22 @@ async function handleSend() {
 
         document.getElementById(`t-${tempId}`).innerText = result;
 
-        // 카드 클릭 → 학습 모달
-        pairDiv.onclick = () => showModal(text, result, isKorean);
+        trackEvent('translate', {
+            input: text,
+            output: result,
+            direction: isKorean ? 'KO→VI' : 'VI→KO',
+            timestamp: Date.now()
+        });
+
+        pairDiv.onclick = () => {
+            trackEvent('card_click', {
+                input: text,
+                output: result,
+                timestamp: Date.now()
+            });
+            showModal(text, result, isKorean);
+        };
+
     } catch (e) {
         document.getElementById(`t-${tempId}`).innerText = "번역 오류";
         console.error(e);
@@ -76,10 +102,9 @@ function showModal(original, translated, isKorean) {
     let chunkHtml = '';
     let matched = new Set();
 
-    // 1차: 숙어 매칭 (우선)
     const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
     idioms.forEach(item => {
-        if (item.southern && translated.includes(item.southern)) {
+        if (item.southern && translated.includes(item.southern) && !matched.has(item.southern)) {
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${item.southern}</span>
@@ -89,7 +114,6 @@ function showModal(original, translated, isKorean) {
         }
     });
 
-    // 2차: 단어 사전 매칭
     const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
     words.forEach(item => {
         if (item.southern && translated.includes(item.southern) && !matched.has(item.southern)) {
@@ -102,7 +126,6 @@ function showModal(original, translated, isKorean) {
         }
     });
 
-    // 3차 폴백: 사전 매칭 없으면 공백 기준 분리
     if (!chunkHtml) {
         const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
         const origWords = original.split(/\s+/).filter(w => w.length > 0);
@@ -116,6 +139,12 @@ function showModal(original, translated, isKorean) {
         });
     }
 
+    trackEvent('modal_open', {
+        original,
+        translated,
+        timestamp: Date.now()
+    });
+
     document.getElementById('modal-body').innerHTML = `
         <div class="modal-header-text">
             <div class="modal-translated">${translated}</div>
@@ -125,6 +154,17 @@ function showModal(original, translated, isKorean) {
         <div class="chunk-grid">${chunkHtml}</div>`;
     modal.style.display = 'flex';
 }
+
+document.addEventListener('click', (e) => {
+    const card = e.target.closest('.chunk-card');
+    if (card) {
+        trackEvent('word_click', {
+            word: card.querySelector('.chunk-v')?.innerText,
+            meaning: card.querySelector('.chunk-k')?.innerText,
+            timestamp: Date.now()
+        });
+    }
+});
 
 document.getElementById('send-btn').onclick = handleSend;
 input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
