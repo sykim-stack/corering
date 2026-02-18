@@ -137,10 +137,11 @@ function showModal(original, translated, isKorean) {
         const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
         const origWords = original.split(/\s+/).filter(w => w.length > 0);
         splitWords.forEach((word, i) => {
+            const meaning = origWords[i] || '';
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${word}</span>
-                    <span class="chunk-k">${origWords[i] || ''}</span>
+                    <span class="chunk-k ${meaning ? '' : 'chunk-empty'}">${meaning || '—'}</span>
                 </div>`;
         });
     }
