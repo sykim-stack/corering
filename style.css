@@ -313,4 +313,9 @@ footer {
 .pair-right .box-bottom {
     color: #666666;
 }
+/* 뜻 없는 단어 - 회색 흐리게 */
+.chunk-empty {
+    color: #333333;
+    font-style: italic;
+}
 
