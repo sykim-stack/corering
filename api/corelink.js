@@ -11,15 +11,20 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { type, input, output, direction, word, meaning, original, translated, timestamp } = req.body;
+        const { type, input, standard_vi, southern_vi, is_southern, timestamp } = req.body;
+
+        if (type !== 'translate') {
+            return res.status(200).json({ ok: true });
+        }
 
         const { error } = await supabase
             .from('tb_trans_logs')
             .insert([{
-                event_type: type,
-                input_text: input || original || word || null,
-                output_text: output || translated || meaning || null,
-                direction: direction || null,
+                source_text: input || null,
+                standard_vi: standard_vi || null,
+                southern_vi: southern_vi || null,
+                is_southern: is_southern || false,
+                keywords: [],
                 created_at: new Date(timestamp).toISOString()
             }]);
 
