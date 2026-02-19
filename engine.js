@@ -70,11 +70,11 @@ async function handleSend() {
         let southernResult = standardResult;
         let isSouthern = false;
 
-        // 충돌 단어 감지
-        const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-            standardResult.includes(item.word)
-        );
-
+// 충돌 단어 감지
+const checkText = isKorean ? standardResult : text;
+const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+    checkText.includes(item.word)
+);
         if (conflictWords.length > 0) {
             document.getElementById(`t-${tempId}`).innerHTML =
                 `${standardResult} <span class="conflict-badge">⚠️ 방언 주의</span>`;
