@@ -1,17 +1,22 @@
 let CORE_DICTIONARY = [];
+let CONFLICT_DICTIONARY = [];
 const input = document.getElementById('userInput');
 const header = document.getElementById('header');
 const history = document.getElementById('chat-history');
 const modal = document.getElementById('modal-overlay');
-let msgCount = 0; // 메시지 순서 카운트
+let msgCount = 0;
 
 async function initEngine() {
     try {
         const res = await fetch('/api/get-sheet-dictionary');
         CORE_DICTIONARY = await res.json();
+
+        const conflictRes = await fetch('/api/get-conflicts');
+        CONFLICT_DICTIONARY = await conflictRes.json();
     } catch (e) {
         console.error("DB Load Failed");
         CORE_DICTIONARY = [];
+        CONFLICT_DICTIONARY = [];
     }
 }
 initEngine();
@@ -44,7 +49,6 @@ async function handleSend() {
     const tempId = Date.now();
     msgCount++;
 
-    // 순서 기반 좌우 결정 (홀수=왼쪽, 짝수=오른쪽)
     const isLeft = msgCount % 2 === 1;
 
     const pairDiv = document.createElement('div');
@@ -66,33 +70,51 @@ async function handleSend() {
         let southernResult = standardResult;
         let isSouthern = false;
 
-        const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
-        const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
+        // 충돌 단어 감지
+        const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+            standardResult.includes(item.word)
+        );
 
-        idioms.forEach(item => {
-            if (item.standard && southernResult.includes(item.standard)) {
-                southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
-                isSouthern = true;
-            }
-        });
-        words.forEach(item => {
-            if (item.standard && southernResult.includes(item.standard)) {
-                southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
-                isSouthern = true;
-            }
-        });
+        if (conflictWords.length > 0) {
+            document.getElementById(`t-${tempId}`).innerHTML =
+                `${standardResult} <span class="conflict-badge">⚠️ 방언 주의</span>`;
 
-        document.getElementById(`t-${tempId}`).innerText = southernResult;
+            trackEvent('conflict_detected', {
+                input: text,
+                output: standardResult,
+                conflicts: conflictWords.map(w => w.word),
+                timestamp: Date.now()
+            });
 
-        trackEvent('translate', {
-            input: text,
-            output: southernResult,
-            standard_vi: standardResult,
-            southern_vi: isSouthern ? southernResult : null,
-            is_southern: isSouthern,
-            direction: isKorean ? 'KO→VI' : 'VI→KO',
-            timestamp: Date.now()
-        });
+        } else {
+            const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
+            const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
+
+            idioms.forEach(item => {
+                if (item.standard && southernResult.includes(item.standard)) {
+                    southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
+                    isSouthern = true;
+                }
+            });
+            words.forEach(item => {
+                if (item.standard && southernResult.includes(item.standard)) {
+                    southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
+                    isSouthern = true;
+                }
+            });
+
+            document.getElementById(`t-${tempId}`).innerText = southernResult;
+
+            trackEvent('translate', {
+                input: text,
+                output: southernResult,
+                standard_vi: standardResult,
+                southern_vi: isSouthern ? southernResult : null,
+                is_southern: isSouthern,
+                direction: isKorean ? 'KO→VI' : 'VI→KO',
+                timestamp: Date.now()
+            });
+        }
 
         pairDiv.onclick = () => {
             trackEvent('card_click', { input: text, output: southernResult, timestamp: Date.now() });
@@ -142,6 +164,20 @@ function showModal(original, translated, isKorean) {
                 <div class="chunk-card">
                     <span class="chunk-v">${word}</span>
                     <span class="chunk-k ${meaning ? '' : 'chunk-empty'}">${meaning || '—'}</span>
+                </div>`;
+        });
+    }
+
+    // 충돌 단어 경고 카드
+    const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+        translated.includes(item.word)
+    );
+    if (conflictWords.length > 0) {
+        conflictWords.forEach(item => {
+            chunkHtml += `
+                <div class="chunk-card conflict-card">
+                    <span class="chunk-v">⚠️ ${item.word}</span>
+                    <span class="chunk-k">북부: ${item.meaning_northern} / 남부: ${item.meaning_southern}</span>
                 </div>`;
         });
     }
