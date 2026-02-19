@@ -168,10 +168,11 @@ function showModal(original, translated, isKorean) {
         });
     }
 
-    // 충돌 단어 경고 카드
-    const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-        translated.includes(item.word)
-    );
+// 충돌 단어 감지
+const checkText = isKorean ? standardResult : text;
+const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+    checkText.includes(item.word)
+);
     if (conflictWords.length > 0) {
         conflictWords.forEach(item => {
             chunkHtml += `
