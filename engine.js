@@ -10,7 +10,6 @@ async function initEngine() {
     try {
         const res = await fetch('/api/get-sheet-dictionary');
         CORE_DICTIONARY = await res.json();
-
         const conflictRes = await fetch('/api/get-conflicts');
         CONFLICT_DICTIONARY = await conflictRes.json();
     } catch (e) {
@@ -70,22 +69,21 @@ async function handleSend() {
         let southernResult = standardResult;
         let isSouthern = false;
 
-// 충돌 단어 감지
-const checkText = isKorean ? standardResult : text;
-const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-    checkText.includes(item.word)
-);
+        // 충돌 단어 감지 (KO→VI면 번역결과, VI→KO면 입력값 체크)
+        const checkText = isKorean ? standardResult : text;
+        const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+            checkText.includes(item.word)
+        );
+
         if (conflictWords.length > 0) {
             document.getElementById(`t-${tempId}`).innerHTML =
                 `${standardResult} <span class="conflict-badge">⚠️ 방언 주의</span>`;
-
             trackEvent('conflict_detected', {
                 input: text,
                 output: standardResult,
                 conflicts: conflictWords.map(w => w.word),
                 timestamp: Date.now()
             });
-
         } else {
             const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
             const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
@@ -168,11 +166,11 @@ function showModal(original, translated, isKorean) {
         });
     }
 
-// 충돌 단어 감지
-const checkText = isKorean ? standardResult : text;
-const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-    checkText.includes(item.word)
-);
+    // 충돌 단어 경고 카드
+    const conflictCheck = isKorean ? translated : original;
+    const conflictWords = CONFLICT_DICTIONARY.filter(item =>
+        conflictCheck.includes(item.word)
+    );
     if (conflictWords.length > 0) {
         conflictWords.forEach(item => {
             chunkHtml += `

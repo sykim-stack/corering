@@ -1,7 +1,6 @@
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
-
     try {
         const response = await fetch(
             `${SUPABASE_URL}/rest/v1/tp_translations?select=standard_word,southern_word,meaning_ko,part_of_speech,category_main&limit=10000`,
@@ -13,7 +12,14 @@ export default async function handler(req, res) {
             }
         );
         const data = await response.json();
-        res.status(200).json(data);
+        const mapped = data.map(item => ({
+            standard: item.standard_word,
+            southern: item.southern_word,
+            meaning: item.meaning_ko,
+            type: item.part_of_speech,
+            category: item.category_main
+        }));
+        res.status(200).json(mapped);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
