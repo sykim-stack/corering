@@ -329,7 +329,10 @@ footer {
     max-height: 85vh;
 }
 
-
+.chunk-north { font-size: 11px; color: #888; display: block; }
+.chunk-south { font-size: 11px; color: #888; display: block; }
+.dialect-diff { color: #f5a623 !important; } /* 남부 방언 다를 때 강조 */
+.dialect-card { border: 1px solid #f5a623; } /* 방언 차이 카드 테두리 */
 
 
 

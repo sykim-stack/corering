@@ -99,22 +99,6 @@ async function handleSend() {
                 timestamp: Date.now()
             });
         } else {
-            const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
-            const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
-
-            idioms.forEach(item => {
-                if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
-                    southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
-                    isSouthern = true;
-                }
-            });
-            words.forEach(item => {
-                if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
-                    southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
-                    isSouthern = true;
-                }
-            });
-
             document.getElementById(`t-${tempId}`).innerText = southernResult;
 
             trackEvent('translate', {
@@ -143,42 +127,45 @@ async function handleSend() {
 
 function showModal(original, translated, isKorean) {
     let chunkHtml = '';
-    let matched = new Set();
 
-    CORE_DICTIONARY.forEach(item => {
-        if (!item.southern || !item.standard) return;
-        if (translated.toLowerCase().includes(item.standard) && !matched.has(item.southern)) {
-            chunkHtml += `
-                <div class="chunk-card">
-                    <span class="chunk-v">${item.southern}</span>
-                    <span class="chunk-k">${item.meaning || item.standard || ''}</span>
-                </div>`;
-            matched.add(item.southern);
-        }
+    // 번역 결과 단어 분리
+    const words = translated.split(/\s+/).filter(w => w.length > 0);
+
+    words.forEach(word => {
+        // 특수문자 제거 후 DB 조회
+        const cleanWord = word.replace(/[.,!?]/g, '');
+
+        const found = CORE_DICTIONARY.find(d =>
+            d.standard?.toLowerCase() === cleanWord.toLowerCase() ||
+            d.southern?.toLowerCase() === cleanWord.toLowerCase()
+        );
+
+        const isDifferent = found && found.standard?.toLowerCase() !== found.southern?.toLowerCase();
+
+        chunkHtml += `
+            <div class="chunk-card ${isDifferent ? 'dialect-card' : ''}">
+                <span class="chunk-v">${cleanWord}</span>
+                ${found ? `
+                    <span class="chunk-north">북부: ${found.standard || cleanWord}</span>
+                    <span class="chunk-south ${isDifferent ? 'dialect-diff' : ''}">
+                        남부: ${found.southern || cleanWord}
+                    </span>
+                    <span class="chunk-k">${found.meaning || '—'}</span>
+                ` : `
+                    <span class="chunk-k">—</span>
+                `}
+            </div>`;
     });
 
-    if (!chunkHtml) {
-        const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
-        splitWords.forEach(word => {
-            const found = CORE_DICTIONARY.find(d =>
-                d.southern?.toLowerCase() === word.toLowerCase() ||
-                d.standard?.toLowerCase() === word.toLowerCase()
-            );
-            chunkHtml += `
-                <div class="chunk-card">
-                    <span class="chunk-v">${word}</span>
-                    <span class="chunk-k">${found ? found.meaning || '' : '—'}</span>
-                </div>`;
-        });
-    }
-
+    // 충돌 단어
     const conflictCheck = isKorean ? translated : original;
     CONFLICT_DICTIONARY.filter(item => conflictCheck.includes(item.word))
         .forEach(item => {
             chunkHtml += `
                 <div class="chunk-card conflict-card">
                     <span class="chunk-v">⚠️ ${item.word}</span>
-                    <span class="chunk-k">북부: ${item.meaning_northern} / 남부: ${item.meaning_southern}</span>
+                    <span class="chunk-north">북부: ${item.meaning_northern}</span>
+                    <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
                 </div>`;
         });
 
