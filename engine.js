@@ -147,4 +147,65 @@ function showModal(original, translated, isKorean) {
 
     CORE_DICTIONARY.forEach(item => {
         if (!item.southern || !item.standard) return;
-        if (translated.to
+        if (translated.toLowerCase().includes(item.standard) && !matched.has(item.southern)) {
+            chunkHtml += `
+                <div class="chunk-card">
+                    <span class="chunk-v">${item.southern}</span>
+                    <span class="chunk-k">${item.meaning || item.standard || ''}</span>
+                </div>`;
+            matched.add(item.southern);
+        }
+    });
+
+    if (!chunkHtml) {
+        const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
+        splitWords.forEach(word => {
+            const found = CORE_DICTIONARY.find(d =>
+                d.southern?.toLowerCase() === word.toLowerCase() ||
+                d.standard?.toLowerCase() === word.toLowerCase()
+            );
+            chunkHtml += `
+                <div class="chunk-card">
+                    <span class="chunk-v">${word}</span>
+                    <span class="chunk-k">${found ? found.meaning || '' : '—'}</span>
+                </div>`;
+        });
+    }
+
+    const conflictCheck = isKorean ? translated : original;
+    CONFLICT_DICTIONARY.filter(item => conflictCheck.includes(item.word))
+        .forEach(item => {
+            chunkHtml += `
+                <div class="chunk-card conflict-card">
+                    <span class="chunk-v">⚠️ ${item.word}</span>
+                    <span class="chunk-k">북부: ${item.meaning_northern} / 남부: ${item.meaning_southern}</span>
+                </div>`;
+        });
+
+    trackEvent('modal_open', { original, translated, timestamp: Date.now() });
+
+    document.getElementById('modal-body').innerHTML = `
+        <div class="modal-header-text">
+            <div class="modal-translated">${translated}</div>
+            <div class="modal-original">${original}</div>
+        </div>
+        <div class="modal-divider"></div>
+        <div class="chunk-grid">${chunkHtml}</div>`;
+    modal.style.display = 'flex';
+}
+
+document.addEventListener('click', (e) => {
+    const card = e.target.closest('.chunk-card');
+    if (card) {
+        trackEvent('word_click', {
+            word: card.querySelector('.chunk-v')?.innerText,
+            meaning: card.querySelector('.chunk-k')?.innerText,
+            timestamp: Date.now()
+        });
+    }
+});
+
+document.getElementById('send-btn').onclick = handleSend;
+input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
+document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
