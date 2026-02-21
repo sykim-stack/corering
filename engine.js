@@ -1,10 +1,24 @@
 let CORE_DICTIONARY = [];
 let CONFLICT_DICTIONARY = [];
+let firstLang = null; // 첫 입력 언어 고정
+
+const SESSION_ID = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 const input = document.getElementById('userInput');
 const header = document.getElementById('header');
 const history = document.getElementById('chat-history');
 const modal = document.getElementById('modal-overlay');
 let msgCount = 0;
+
+function calcEmotionScore(text) {
+    let score = 0;
+    const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
+    const positiveWords = ['고마워', '사랑해', '괜찮아', '미안해'];
+    negativeWords.forEach(w => { if (text.includes(w)) score += 2; });
+    positiveWords.forEach(w => { if (text.includes(w)) score -= 1; });
+    if (text.length < 5) score += 1;
+    if (text.includes('!') || text.includes('?')) score += 1;
+    return Math.max(0, score);
+}
 
 async function initEngine() {
     try {
@@ -48,7 +62,9 @@ async function handleSend() {
     const tempId = Date.now();
     msgCount++;
 
-    const isLeft = msgCount % 2 === 1;
+    // 첫 입력 언어 고정
+    if (msgCount === 1) firstLang = isKorean ? 'ko' : 'vi';
+    const isLeft = firstLang === 'ko' ? isKorean : !isKorean;
 
     const pairDiv = document.createElement('div');
     pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
@@ -69,7 +85,6 @@ async function handleSend() {
         let southernResult = standardResult;
         let isSouthern = false;
 
-        // 충돌 단어 감지 (KO→VI면 번역결과, VI→KO면 입력값 체크)
         const checkText = isKorean ? standardResult : text;
         const conflictWords = CONFLICT_DICTIONARY.filter(item =>
             checkText.includes(item.word)
@@ -110,6 +125,8 @@ async function handleSend() {
                 southern_vi: isSouthern ? southernResult : null,
                 is_southern: isSouthern,
                 direction: isKorean ? 'KO→VI' : 'VI→KO',
+                emotion_score: calcEmotionScore(text),
+                session_id: SESSION_ID,
                 timestamp: Date.now()
             });
         }
@@ -129,21 +146,10 @@ function showModal(original, translated, isKorean) {
     let chunkHtml = '';
     let matched = new Set();
 
-    const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
-    idioms.forEach(item => {
-        if (item.southern && translated.includes(item.southern) && !matched.has(item.southern)) {
-            chunkHtml += `
-                <div class="chunk-card">
-                    <span class="chunk-v">${item.southern}</span>
-                    <span class="chunk-k">${item.meaning || ''}</span>
-                </div>`;
-            matched.add(item.southern);
-        }
-    });
-
-    const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
-    words.forEach(item => {
-        if (item.southern && translated.includes(item.southern) && !matched.has(item.southern)) {
+    // DB에서 번역 단어 매칭
+    CORE_DICTIONARY.forEach(item => {
+        if (!item.southern || !item.standard) return;
+        if (translated.includes(item.southern) && !matched.has(item.southern)) {
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${item.southern}</span>
@@ -153,33 +159,29 @@ function showModal(original, translated, isKorean) {
         }
     });
 
+    // DB 매칭 없으면 단어 분리
     if (!chunkHtml) {
         const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
-        const origWords = original.split(/\s+/).filter(w => w.length > 0);
-        splitWords.forEach((word, i) => {
-            const meaning = origWords[i] || '';
+        splitWords.forEach(word => {
+            const found = CORE_DICTIONARY.find(d => d.southern === word || d.standard === word);
             chunkHtml += `
                 <div class="chunk-card">
                     <span class="chunk-v">${word}</span>
-                    <span class="chunk-k ${meaning ? '' : 'chunk-empty'}">${meaning || '—'}</span>
+                    <span class="chunk-k">${found ? found.meaning || '' : '—'}</span>
                 </div>`;
         });
     }
 
     // 충돌 단어 경고 카드
     const conflictCheck = isKorean ? translated : original;
-    const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-        conflictCheck.includes(item.word)
-    );
-    if (conflictWords.length > 0) {
-        conflictWords.forEach(item => {
+    CONFLICT_DICTIONARY.filter(item => conflictCheck.includes(item.word))
+        .forEach(item => {
             chunkHtml += `
                 <div class="chunk-card conflict-card">
                     <span class="chunk-v">⚠️ ${item.word}</span>
                     <span class="chunk-k">북부: ${item.meaning_northern} / 남부: ${item.meaning_southern}</span>
                 </div>`;
         });
-    }
 
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
