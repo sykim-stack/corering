@@ -17,13 +17,13 @@ export default async function handler(req, res) {
 
         const merged = [
             ...translations.map(d => ({
-                standard: d.standard_word,
+                standard: d.standard_word?.toLowerCase(),
                 southern: d.southern_word,
                 meaning: d.meaning_ko,
                 type: d.part_of_speech || '단어'
             })),
             ...dictionary.map(d => ({
-                standard: d.standard_vi,
+                standard: d.standard_vi?.toLowerCase(),
                 southern: d.southern_vi,
                 meaning: d.meaning_kr,
                 type: d.type || '단어'

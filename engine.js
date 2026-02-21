@@ -1,6 +1,6 @@
 let CORE_DICTIONARY = [];
 let CONFLICT_DICTIONARY = [];
-let firstLang = null; // 첫 입력 언어 고정
+let firstLang = null;
 
 const SESSION_ID = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 const input = document.getElementById('userInput');
@@ -62,7 +62,6 @@ async function handleSend() {
     const tempId = Date.now();
     msgCount++;
 
-    // 첫 입력 언어 고정
     if (msgCount === 1) firstLang = isKorean ? 'ko' : 'vi';
     const isLeft = firstLang === 'ko' ? isKorean : !isKorean;
 
@@ -104,13 +103,13 @@ async function handleSend() {
             const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
 
             idioms.forEach(item => {
-                if (item.standard && southernResult.includes(item.standard)) {
+                if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
                     southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
                     isSouthern = true;
                 }
             });
             words.forEach(item => {
-                if (item.standard && southernResult.includes(item.standard)) {
+                if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
                     southernResult = southernResult.replace(new RegExp(item.standard, 'gi'), item.southern);
                     isSouthern = true;
                 }
@@ -146,67 +145,6 @@ function showModal(original, translated, isKorean) {
     let chunkHtml = '';
     let matched = new Set();
 
-    // DB에서 번역 단어 매칭
     CORE_DICTIONARY.forEach(item => {
         if (!item.southern || !item.standard) return;
-        if (translated.includes(item.southern) && !matched.has(item.southern)) {
-            chunkHtml += `
-                <div class="chunk-card">
-                    <span class="chunk-v">${item.southern}</span>
-                    <span class="chunk-k">${item.meaning || item.standard || ''}</span>
-                </div>`;
-            matched.add(item.southern);
-        }
-    });
-
-    // DB 매칭 없으면 단어 분리
-    if (!chunkHtml) {
-        const splitWords = translated.split(/\s+/).filter(w => w.length > 1);
-        splitWords.forEach(word => {
-            const found = CORE_DICTIONARY.find(d => d.southern === word || d.standard === word);
-            chunkHtml += `
-                <div class="chunk-card">
-                    <span class="chunk-v">${word}</span>
-                    <span class="chunk-k">${found ? found.meaning || '' : '—'}</span>
-                </div>`;
-        });
-    }
-
-    // 충돌 단어 경고 카드
-    const conflictCheck = isKorean ? translated : original;
-    CONFLICT_DICTIONARY.filter(item => conflictCheck.includes(item.word))
-        .forEach(item => {
-            chunkHtml += `
-                <div class="chunk-card conflict-card">
-                    <span class="chunk-v">⚠️ ${item.word}</span>
-                    <span class="chunk-k">북부: ${item.meaning_northern} / 남부: ${item.meaning_southern}</span>
-                </div>`;
-        });
-
-    trackEvent('modal_open', { original, translated, timestamp: Date.now() });
-
-    document.getElementById('modal-body').innerHTML = `
-        <div class="modal-header-text">
-            <div class="modal-translated">${translated}</div>
-            <div class="modal-original">${original}</div>
-        </div>
-        <div class="modal-divider"></div>
-        <div class="chunk-grid">${chunkHtml}</div>`;
-    modal.style.display = 'flex';
-}
-
-document.addEventListener('click', (e) => {
-    const card = e.target.closest('.chunk-card');
-    if (card) {
-        trackEvent('word_click', {
-            word: card.querySelector('.chunk-v')?.innerText,
-            meaning: card.querySelector('.chunk-k')?.innerText,
-            timestamp: Date.now()
-        });
-    }
-});
-
-document.getElementById('send-btn').onclick = handleSend;
-input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
-document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+        if (translated.to
