@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const { text, target } = req.query;
-    const KEY = 'b7d91801-1316-448a-9896-dea29a271183:fx';
+    const KEY = process.env.DEEPL_API_KEY; // ✅ 환경변수로 변경
 
     if (!text) return res.status(400).json({ error: '텍스트 누락' });
 
