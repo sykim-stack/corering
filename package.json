@@ -1,0 +1,24 @@
+{
+  "name": "corering",
+  "version": "1.0.0",
+  "description": "",
+  "main": "engine.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sykim-stack/corering.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sykim-stack/corering/issues"
+  },
+  "homepage": "https://github.com/sykim-stack/corering#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0"
+  }
+}
