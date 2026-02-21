@@ -99,6 +99,28 @@ async function handleSend() {
                 timestamp: Date.now()
             });
         } else {
+            // KO→VI: 남부 방언 치환
+            if (isKorean) {
+                const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
+                const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
+                idioms.forEach(item => {
+                    if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
+                        southernResult = southernResult.replace(
+                            new RegExp(`\\b${item.standard}\\b`, 'gi'), item.southern
+                        );
+                        isSouthern = true;
+                    }
+                });
+                words.forEach(item => {
+                    if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
+                        southernResult = southernResult.replace(
+                            new RegExp(`\\b${item.standard}\\b`, 'gi'), item.southern
+                        );
+                        isSouthern = true;
+                    }
+                });
+            }
+
             document.getElementById(`t-${tempId}`).innerText = southernResult;
 
             trackEvent('translate', {
@@ -116,7 +138,10 @@ async function handleSend() {
 
         pairDiv.onclick = () => {
             trackEvent('card_click', { input: text, output: southernResult, timestamp: Date.now() });
-            showModal(text, southernResult, isKorean);
+            // KO→VI: 번역결과(베트남어)로 카드
+            // VI→KO: 입력값(베트남어)으로 카드
+            const cardText = isKorean ? southernResult : text;
+            showModal(text, southernResult, isKorean, cardText);
         };
 
     } catch (e) {
@@ -125,22 +150,22 @@ async function handleSend() {
     }
 }
 
-function showModal(original, translated, isKorean) {
+function showModal(original, translated, isKorean, cardText) {
     let chunkHtml = '';
 
-    // 번역 결과 단어 분리
-    const words = translated.split(/\s+/).filter(w => w.length > 0);
+    const words = cardText.split(/\s+/).filter(w => w.length > 0);
 
     words.forEach(word => {
-        // 특수문자 제거 후 DB 조회
         const cleanWord = word.replace(/[.,!?]/g, '');
+        if (!cleanWord) return;
 
         const found = CORE_DICTIONARY.find(d =>
             d.standard?.toLowerCase() === cleanWord.toLowerCase() ||
             d.southern?.toLowerCase() === cleanWord.toLowerCase()
         );
 
-        const isDifferent = found && found.standard?.toLowerCase() !== found.southern?.toLowerCase();
+        const isDifferent = found &&
+            found.standard?.toLowerCase() !== found.southern?.toLowerCase();
 
         chunkHtml += `
             <div class="chunk-card ${isDifferent ? 'dialect-card' : ''}">
