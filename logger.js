@@ -1,15 +1,12 @@
-// logger.js
-// corelink API Route 통해서 저장 (키 노출 없음)
+// ============================================================
+// BRAINPOOL | CoreRing logger.js v1.0
+// 번역 로그 저장 - corelink API 호출
+// ============================================================
 
-export async function saveTranslationLog({
-    inputText,
-    outputText,
-    direction,
-    detectedDialect,
-    finalDialect,
-    emotionScore,
-    sessionId,
-    conflictCount = 0
+async function saveTranslationLog({
+    inputText, outputText, direction,
+    detectedDialect, finalDialect,
+    emotionScore, sessionId, conflictCount
 }) {
     try {
         await fetch('/api/corelink', {
@@ -24,7 +21,8 @@ export async function saveTranslationLog({
                 final_dialect: finalDialect,
                 emotion_score: emotionScore,
                 session_id: sessionId,
-                is_southern: finalDialect === 'south'
+                is_southern: finalDialect === 'south',
+                timestamp: Date.now()
             })
         });
     } catch (e) {
