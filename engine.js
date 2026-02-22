@@ -1,6 +1,11 @@
+import { detectDialectScore, resolveDialect } from './dialect.js';
+import { detectConflicts } from './conflict.js';
+import { saveTranslationLog } from './logger.js';
+
 let CORE_DICTIONARY = [];
 let CONFLICT_DICTIONARY = [];
 let firstLang = null;
+let userLocale = null; // profiles.vi_locale (로그인 시 설정)
 
 const SESSION_ID = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 const input = document.getElementById('userInput');
@@ -9,7 +14,7 @@ const history = document.getElementById('chat-history');
 const modal = document.getElementById('modal-overlay');
 let msgCount = 0;
 
-function calcEmotionScore(text) {
+export function calcEmotionScore(text) {
     let score = 0;
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
     const positiveWords = ['고마워', '사랑해', '괜찮아', '미안해'];
@@ -39,11 +44,6 @@ function trackEvent(type, data) {
     const session = JSON.parse(sessionStorage.getItem('core_session') || '[]');
     session.push(payload);
     sessionStorage.setItem('core_session', JSON.stringify(session));
-    fetch('/api/corelink', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).catch(() => {});
 }
 
 input.addEventListener('input', () => {
@@ -80,68 +80,53 @@ async function handleSend() {
         const target = isKorean ? 'VI' : 'KO';
         const res = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
-        let standardResult = data.translations[0].text;
-        let southernResult = standardResult;
-        let isSouthern = false;
+        const rawTranslation = data.translations[0].text;
 
-        const checkText = isKorean ? standardResult : text;
-        const conflictWords = CONFLICT_DICTIONARY.filter(item =>
-            checkText.includes(item.word)
-        );
+        // ① 방언 감지
+        const checkText = isKorean ? rawTranslation : text;
+        const detectedDialect = detectDialectScore(checkText);
 
-        if (conflictWords.length > 0) {
+        // ② 방언 결정
+        const finalDialect = resolveDialect({ detectedDialect, userLocale });
+
+        // ③ 충돌 감지
+        const conflicts = detectConflicts(checkText, CONFLICT_DICTIONARY);
+
+        // ④ 감정 점수
+        const emotionScore = calcEmotionScore(text);
+
+        // ⑤ UI 출력
+        if (conflicts.length > 0) {
             document.getElementById(`t-${tempId}`).innerHTML =
-                `${standardResult} <span class="conflict-badge">⚠️ 방언 주의</span>`;
-            trackEvent('conflict_detected', {
-                input: text,
-                output: standardResult,
-                conflicts: conflictWords.map(w => w.word),
-                timestamp: Date.now()
-            });
+                `${rawTranslation} <span class="conflict-badge">⚠️ 방언 주의</span>`;
         } else {
-            // KO→VI: 남부 방언 치환
-            if (isKorean) {
-                const idioms = CORE_DICTIONARY.filter(item => item.type === '숙어');
-                const words = CORE_DICTIONARY.filter(item => item.type !== '숙어');
-                idioms.forEach(item => {
-                    if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
-                        southernResult = southernResult.replace(
-                            new RegExp(`\\b${item.standard}\\b`, 'gi'), item.southern
-                        );
-                        isSouthern = true;
-                    }
-                });
-                words.forEach(item => {
-                    if (item.standard && southernResult.toLowerCase().includes(item.standard)) {
-                        southernResult = southernResult.replace(
-                            new RegExp(`\\b${item.standard}\\b`, 'gi'), item.southern
-                        );
-                        isSouthern = true;
-                    }
-                });
-            }
-
-            document.getElementById(`t-${tempId}`).innerText = southernResult;
-
-            trackEvent('translate', {
-                input: text,
-                output: southernResult,
-                standard_vi: standardResult,
-                southern_vi: isSouthern ? southernResult : null,
-                is_southern: isSouthern,
-                direction: isKorean ? 'KO→VI' : 'VI→KO',
-                emotion_score: calcEmotionScore(text),
-                session_id: SESSION_ID,
-                timestamp: Date.now()
-            });
+            document.getElementById(`t-${tempId}`).innerText = rawTranslation;
         }
 
+        // ⑥ 로그 저장
+        await saveTranslationLog({
+            inputText: text,
+            outputText: rawTranslation,
+            direction: isKorean ? 'KO→VI' : 'VI→KO',
+            detectedDialect,
+            finalDialect,
+            emotionScore,
+            sessionId: SESSION_ID,
+            conflictCount: conflicts.length
+        });
+
+        trackEvent('translate', {
+            input: text,
+            output: rawTranslation,
+            dialect: finalDialect,
+            emotionScore,
+            timestamp: Date.now()
+        });
+
         pairDiv.onclick = () => {
-            trackEvent('card_click', { input: text, output: southernResult, timestamp: Date.now() });
-            // KO→VI: 번역결과(베트남어)로 카드
-            // VI→KO: 입력값(베트남어)으로 카드
-            const cardText = isKorean ? southernResult : text;
-            showModal(text, southernResult, isKorean, cardText);
+            trackEvent('card_click', { input: text, output: rawTranslation, timestamp: Date.now() });
+            const cardText = isKorean ? rawTranslation : text;
+            showModal(text, rawTranslation, isKorean, cardText);
         };
 
     } catch (e) {
@@ -182,17 +167,15 @@ function showModal(original, translated, isKorean, cardText) {
             </div>`;
     });
 
-    // 충돌 단어
     const conflictCheck = isKorean ? translated : original;
-    CONFLICT_DICTIONARY.filter(item => conflictCheck.includes(item.word))
-        .forEach(item => {
-            chunkHtml += `
-                <div class="chunk-card conflict-card">
-                    <span class="chunk-v">⚠️ ${item.word}</span>
-                    <span class="chunk-north">북부: ${item.meaning_northern}</span>
-                    <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
-                </div>`;
-        });
+    detectConflicts(conflictCheck, CONFLICT_DICTIONARY).forEach(item => {
+        chunkHtml += `
+            <div class="chunk-card conflict-card">
+                <span class="chunk-v">⚠️ ${item.word}</span>
+                <span class="chunk-north">북부: ${item.meaning_northern}</span>
+                <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
+            </div>`;
+    });
 
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
