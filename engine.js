@@ -1,11 +1,83 @@
-import { detectDialectScore, resolveDialect } from './dialect.js';
-import { detectConflicts } from './conflict.js';
-import { saveTranslationLog } from './logger.js';
+// ============================================================
+// BRAINPOOL | CoreRing Engine
+// dialect.js + conflict.js + logger.js 통합
+// ============================================================
 
+// ─── dialect.js 인라인 ───
+const dialectRules = [
+    { word: 'bố', dialect: 'north' },
+    { word: 'mẹ', dialect: 'north' },
+    { word: 'không', dialect: 'north' },
+    { word: 'ạ', dialect: 'north' },
+    { word: 'nhé', dialect: 'north' },
+    { word: 'ba', dialect: 'south' },
+    { word: 'má', dialect: 'south' },
+    { word: 'hông', dialect: 'south' },
+    { word: 'nha', dialect: 'south' },
+    { word: 'vậy', dialect: 'south' },
+    { word: 'hen', dialect: 'south' },
+    { word: 'dzậy', dialect: 'south' },
+];
+
+function detectDialectScore(text) {
+    if (!text) return 'neutral';
+    let score = { north: 0, south: 0 };
+    const lowerText = text.toLowerCase();
+    dialectRules.forEach(r => {
+        if (lowerText.includes(r.word)) score[r.dialect]++;
+    });
+    if (score.north > score.south) return 'north';
+    if (score.south > score.north) return 'south';
+    return 'neutral';
+}
+
+function resolveDialect({ detectedDialect, userLocale }) {
+    if (userLocale === 'vi_north') return 'north';
+    if (userLocale === 'vi_south') return 'south';
+    return detectedDialect || 'neutral';
+}
+
+// ─── conflict.js 인라인 ───
+function detectConflicts(text, conflictDictionary) {
+    if (!text || !conflictDictionary) return [];
+    return conflictDictionary.filter(item =>
+        text.toLowerCase().includes(item.word.toLowerCase())
+    );
+}
+
+// ─── logger.js 인라인 ───
+async function saveTranslationLog({
+    inputText, outputText, direction,
+    detectedDialect, finalDialect,
+    emotionScore, sessionId, conflictCount
+}) {
+    try {
+        await fetch('/api/corelink', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'translate',
+                input: inputText,
+                standard_vi: outputText,
+                direction,
+                detected_dialect: detectedDialect,
+                final_dialect: finalDialect,
+                emotion_score: emotionScore,
+                session_id: sessionId,
+                is_southern: finalDialect === 'south',
+                timestamp: Date.now()
+            })
+        });
+    } catch (e) {
+        console.error('Log Save Error:', e);
+    }
+}
+
+// ─── 메인 엔진 ───
 let CORE_DICTIONARY = [];
 let CONFLICT_DICTIONARY = [];
 let firstLang = null;
-let userLocale = null; // profiles.vi_locale (로그인 시 설정)
+let userLocale = null;
 
 const SESSION_ID = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 const input = document.getElementById('userInput');
@@ -14,7 +86,7 @@ const history = document.getElementById('chat-history');
 const modal = document.getElementById('modal-overlay');
 let msgCount = 0;
 
-export function calcEmotionScore(text) {
+function calcEmotionScore(text) {
     let score = 0;
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
     const positiveWords = ['고마워', '사랑해', '괜찮아', '미안해'];
@@ -167,15 +239,16 @@ function showModal(original, translated, isKorean, cardText) {
             </div>`;
     });
 
-    const conflictCheck = isKorean ? translated : original;
-    detectConflicts(conflictCheck, CONFLICT_DICTIONARY).forEach(item => {
-        chunkHtml += `
-            <div class="chunk-card conflict-card">
-                <span class="chunk-v">⚠️ ${item.word}</span>
-                <span class="chunk-north">북부: ${item.meaning_northern}</span>
-                <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
-            </div>`;
-    });
+    // 충돌 단어 카드
+    detectConflicts(isKorean ? translated : original, CONFLICT_DICTIONARY)
+        .forEach(item => {
+            chunkHtml += `
+                <div class="chunk-card conflict-card">
+                    <span class="chunk-v">⚠️ ${item.word}</span>
+                    <span class="chunk-north">북부: ${item.meaning_northern}</span>
+                    <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
+                </div>`;
+        });
 
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
