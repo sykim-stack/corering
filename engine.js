@@ -173,13 +173,21 @@ function showModal(original, translated, isKorean, cardText) {
         if (!cleanWord) return;
 
         const clean = cleanWord.toLowerCase();
-        const found = CORE_DICTIONARY.find(d =>
-            d.standard?.toLowerCase() === clean ||
-            d.southern?.toLowerCase() === clean
-        ) || CORE_DICTIONARY.find(d =>
-            d.standard?.toLowerCase().includes(clean) ||
-            d.southern?.toLowerCase().includes(clean)
-        );
+        const found =
+            // ① 완전 일치 (standard / southern)
+            CORE_DICTIONARY.find(d =>
+                d.standard?.toLowerCase() === clean ||
+                d.southern?.toLowerCase() === clean
+            ) ||
+            // ② 부분 매칭 (standard / southern)
+            CORE_DICTIONARY.find(d =>
+                d.standard?.toLowerCase().includes(clean) ||
+                d.southern?.toLowerCase().includes(clean)
+            ) ||
+            // ③ meaning 역방향 검색 (한국어 의미로 찾기)
+            CORE_DICTIONARY.find(d =>
+                d.meaning?.toLowerCase().includes(clean)
+            );
         const isDifferent = found &&
             found.standard?.toLowerCase() !== found.southern?.toLowerCase();
 
