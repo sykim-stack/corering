@@ -52,7 +52,84 @@ async function initEngine() {
         CONFLICT_DICTIONARY = [];
     }
 }
-initEngine();
+initEngine().then(() => {
+    showWelcomeScreen();
+});
+
+// ─── 웰컴 화면 (오늘의 문장 + 배경 패턴) ────────────────────────
+function showWelcomeScreen() {
+    const historyEl = document.getElementById('chat-history');
+
+    // 배경 패턴
+    historyEl.style.cssText += `
+        background-image: repeating-linear-gradient(
+            45deg,
+            rgba(255,255,255,0.012) 0px,
+            rgba(255,255,255,0.012) 1px,
+            transparent 1px,
+            transparent 40px
+        ),
+        repeating-linear-gradient(
+            -45deg,
+            rgba(255,255,255,0.012) 0px,
+            rgba(255,255,255,0.012) 1px,
+            transparent 1px,
+            transparent 40px
+        );
+    `;
+
+    // DB에서 랜덤 phrase 뽑기
+    const phrases = CORE_DICTIONARY.filter(d =>
+        d.entry_type === 'phrase' || (d.standard?.split(' ').length > 1)
+    );
+    const pool = phrases.length > 0 ? phrases : CORE_DICTIONARY;
+    const item = pool[Math.floor(Math.random() * pool.length)];
+
+    if (!item) return;
+
+    const vi   = item.standard || item.standard_word || '';
+    const ko   = item.meaning  || item.meaning_ko    || '';
+    const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+
+    const welcome = document.createElement('div');
+    welcome.id = 'welcome-card';
+    welcome.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        padding: 40px 24px;
+        text-align: center;
+        animation: fadeInUp 0.6s ease;
+    `;
+    welcome.innerHTML = \`
+        <div style="font-size:11px; letter-spacing:3px; color:#444; margin-bottom:32px; text-transform:uppercase;">
+            \${date} · 오늘의 문장
+        </div>
+        <div style="
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 32px 28px;
+            max-width: 320px;
+            width: 100%;
+        ">
+            <div style="font-size:19px; font-weight:600; color:#ffffff; line-height:1.5; margin-bottom:16px;">
+                \${vi}
+            </div>
+            <div style="width:32px; height:1px; background:rgba(255,255,255,0.15); margin:0 auto 16px;"></div>
+            <div style="font-size:14px; color:#888; line-height:1.6;">
+                \${ko}
+            </div>
+        </div>
+        <div style="margin-top:28px; font-size:12px; color:#333; letter-spacing:1px;">
+            한국어 또는 베트남어를 입력하세요
+        </div>
+    \`;
+
+    historyEl.appendChild(welcome);
+}
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
@@ -80,7 +157,11 @@ async function handleSend() {
     const tempId   = Date.now();
     msgCount++;
 
-    if (msgCount === 1) firstLang = isKorean ? 'ko' : 'vi';
+    if (msgCount === 1) {
+        firstLang = isKorean ? 'ko' : 'vi';
+        const wc = document.getElementById('welcome-card');
+        if (wc) wc.remove();
+    }
     const isLeft = firstLang === 'ko' ? isKorean : !isKorean;
 
     // UI - 로딩 버블
