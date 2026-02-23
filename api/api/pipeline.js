@@ -1,14 +1,13 @@
 // ============================================================
-// BRAINPOOL | CoreRing api/pipeline.js
-// Vercel Serverless Function
-// auto_save_translation RPC 호출
+// BRAINPOOL | CoreRing api/pipeline.js v2.0
+// 실제 컬럼명 기준 수정: standard_word, meaning_ko
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY  // service_role 키 (RLS 우회)
+    process.env.SUPABASE_SERVICE_KEY
 );
 
 export default async function handler(req, res) {
@@ -16,16 +15,16 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { korean, vietnamese, direction } = req.body;
+    const { standard_word, meaning_ko, entry_type } = req.body;
 
-    if (!korean || !vietnamese || !direction) {
+    if (!standard_word || !meaning_ko) {
         return res.status(400).json({ error: 'Missing fields' });
     }
 
     const { data, error } = await supabase.rpc('auto_save_translation', {
-        p_korean:      korean,
-        p_vietnamese:  vietnamese,
-        p_direction:   direction
+        p_standard_word: standard_word,
+        p_meaning_ko:    meaning_ko,
+        p_entry_type:    entry_type || 'word'
     });
 
     if (error) {
