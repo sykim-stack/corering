@@ -172,9 +172,13 @@ function showModal(original, translated, isKorean, cardText) {
         const cleanWord = word.replace(/[.,!?]/g, '');
         if (!cleanWord) return;
 
+        const clean = cleanWord.toLowerCase();
         const found = CORE_DICTIONARY.find(d =>
-            d.standard?.toLowerCase()  === cleanWord.toLowerCase() ||
-            d.southern?.toLowerCase()  === cleanWord.toLowerCase()
+            d.standard?.toLowerCase() === clean ||
+            d.southern?.toLowerCase() === clean
+        ) || CORE_DICTIONARY.find(d =>
+            d.standard?.toLowerCase().includes(clean) ||
+            d.southern?.toLowerCase().includes(clean)
         );
         const isDifferent = found &&
             found.standard?.toLowerCase() !== found.southern?.toLowerCase();
