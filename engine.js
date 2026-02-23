@@ -129,7 +129,10 @@ async function handleSend() {
         }
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
-        // ⑥ 로그 저장 (logger.js)
+        // ⑥ 자동 데이터셋 저장 (tp_translations - pending)
+        autoSaveToDataset({ inputText: text, outputText: rawTranslation, isKorean });
+
+        // ⑦ 로그 저장 (logger.js)
         await saveTranslationLog({
             inputText:      text,
             outputText:     rawTranslation,
