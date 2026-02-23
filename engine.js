@@ -103,9 +103,9 @@ function showWelcomeScreen() {
         text-align: center;
         animation: fadeInUp 0.6s ease;
     `;
-    welcome.innerHTML = \`
+    welcome.innerHTML = `
         <div style="font-size:11px; letter-spacing:3px; color:#444; margin-bottom:32px; text-transform:uppercase;">
-            \${date} · 오늘의 문장
+            ${date} · 오늘의 문장
         </div>
         <div style="
             background: rgba(255,255,255,0.04);
@@ -116,17 +116,17 @@ function showWelcomeScreen() {
             width: 100%;
         ">
             <div style="font-size:19px; font-weight:600; color:#ffffff; line-height:1.5; margin-bottom:16px;">
-                \${vi}
+                ${vi}
             </div>
             <div style="width:32px; height:1px; background:rgba(255,255,255,0.15); margin:0 auto 16px;"></div>
             <div style="font-size:14px; color:#888; line-height:1.6;">
-                \${ko}
+                ${ko}
             </div>
         </div>
         <div style="margin-top:28px; font-size:12px; color:#333; letter-spacing:1px;">
             한국어 또는 베트남어를 입력하세요
         </div>
-    \`;
+    `;
 
     historyEl.appendChild(welcome);
 }
