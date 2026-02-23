@@ -52,68 +52,42 @@ async function initEngine() {
         CONFLICT_DICTIONARY = [];
     }
 }
-initEngine().then(() => {
-    showWelcomeScreen();
-});
+// ─── 웰컴 화면 하드코딩 문장 (즉시 표시용) ─────────────────────
+const WELCOME_PHRASES = [
+    { vi: 'Anh yêu em.',           ko: '나는 당신을 사랑해요.' },
+    { vi: 'Cảm ơn em rất nhiều.',  ko: '정말 고마워요.' },
+    { vi: 'Em có khỏe không?',     ko: '잘 지내고 있어요?' },
+    { vi: 'Chúc em ngủ ngon.',     ko: '잘 자요.' },
+    { vi: 'Em đẹp lắm.',           ko: '당신은 정말 예뻐요.' },
+];
 
-// ─── 웰컴 화면 (오늘의 문장 + 배경 패턴) ────────────────────────
-function showWelcomeScreen() {
+// ─── 웰컴 화면 렌더 ───────────────────────────────────────────
+function renderWelcomeCard(vi, ko) {
     const historyEl = document.getElementById('chat-history');
-
-    // 배경 패턴
-    historyEl.style.cssText += `
-        background-image: repeating-linear-gradient(
-            45deg,
-            rgba(255,255,255,0.012) 0px,
-            rgba(255,255,255,0.012) 1px,
-            transparent 1px,
-            transparent 40px
-        ),
-        repeating-linear-gradient(
-            -45deg,
-            rgba(255,255,255,0.012) 0px,
-            rgba(255,255,255,0.012) 1px,
-            transparent 1px,
-            transparent 40px
-        );
-    `;
-
-    // DB에서 랜덤 phrase 뽑기
-    const phrases = CORE_DICTIONARY.filter(d =>
-        d.entry_type === 'phrase' || (d.standard?.split(' ').length > 1)
-    );
-    const pool = phrases.length > 0 ? phrases : CORE_DICTIONARY;
-    const item = pool[Math.floor(Math.random() * pool.length)];
-
-    if (!item) return;
-
-    const vi   = item.standard || item.standard_word || '';
-    const ko   = item.meaning  || item.meaning_ko    || '';
     const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
 
-    const welcome = document.createElement('div');
-    welcome.id = 'welcome-card';
-    welcome.style.cssText = `
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 60vh;
-        padding: 40px 24px;
-        text-align: center;
-        animation: fadeInUp 0.6s ease;
-    `;
-    welcome.innerHTML = `
+    let card = document.getElementById('welcome-card');
+    if (!card) {
+        card = document.createElement('div');
+        card.id = 'welcome-card';
+        card.style.cssText = `
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 60vh; padding: 40px 24px;
+            text-align: center; animation: fadeInUp 0.6s ease;
+        `;
+        historyEl.appendChild(card);
+    }
+
+    card.innerHTML = `
         <div style="font-size:11px; letter-spacing:3px; color:#444; margin-bottom:32px; text-transform:uppercase;">
             ${date} · 오늘의 문장
         </div>
         <div style="
             background: rgba(255,255,255,0.04);
             border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 20px;
-            padding: 32px 28px;
-            max-width: 320px;
-            width: 100%;
+            border-radius: 20px; padding: 32px 28px;
+            max-width: 320px; width: 100%;
         ">
             <div style="font-size:19px; font-weight:600; color:#ffffff; line-height:1.5; margin-bottom:16px;">
                 ${vi}
@@ -127,9 +101,42 @@ function showWelcomeScreen() {
             한국어 또는 베트남어를 입력하세요
         </div>
     `;
-
-    historyEl.appendChild(welcome);
 }
+
+// ─── 웰컴 화면 초기화 ────────────────────────────────────────
+function showWelcomeScreen() {
+    const historyEl = document.getElementById('chat-history');
+
+    // 배경 패턴
+    historyEl.style.cssText += `
+        background-image: repeating-linear-gradient(
+            45deg, rgba(255,255,255,0.012) 0px,
+            rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px
+        ), repeating-linear-gradient(
+            -45deg, rgba(255,255,255,0.012) 0px,
+            rgba(255,255,255,0.012) 1px, transparent 1px, transparent 40px
+        );
+    `;
+
+    // ① 즉시 - 하드코딩 문장 표시
+    const preset = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
+    renderWelcomeCard(preset.vi, preset.ko);
+
+    // ② DB 로딩 완료 후 - DB 랜덤 문장으로 교체
+    initEngine().then(() => {
+        const phrases = CORE_DICTIONARY.filter(d =>
+            d.entry_type === 'phrase' || (d.standard?.split(' ').length > 1)
+        );
+        const pool = phrases.length > 0 ? phrases : CORE_DICTIONARY;
+        const item = pool[Math.floor(Math.random() * pool.length)];
+        if (!item) return;
+        const vi = item.standard || item.standard_word || '';
+        const ko = item.meaning  || item.meaning_ko    || '';
+        if (vi && ko) renderWelcomeCard(vi, ko);
+    });
+}
+
+showWelcomeScreen();
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
