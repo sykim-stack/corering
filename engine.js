@@ -1,13 +1,7 @@
 // ============================================================
-// BRAINPOOL | CoreRing Engine v3.0
-// 번역 처리 전용. 모듈 분리:
-//   dialect.js  → 방언 감지
-//   conflict.js → 충돌 단어 감지 (UI 배지)
-//   logger.js   → 로그 저장
-//   mindworld.js → 감정/역할/리스크 분석
-//
-// 로드 순서 (index.html):
-//   dialect.js → conflict.js → logger.js → mindworld.js → engine.js
+// BRAINPOOL | CoreRing Engine v3.4 → CoreChat 업그레이드
+// RING 모드: DeepL 번역 + 단어 카드
+// CHAT 모드: Gemini 멀티턴 + 국제결혼 특화
 // ============================================================
 
 let CORE_DICTIONARY     = [];
@@ -15,6 +9,12 @@ let CONFLICT_DICTIONARY = [];
 let firstLang           = null;
 let userLocale          = null;
 let engineInitialized   = false;
+let currentMode         = localStorage.getItem('core_mode') || 'RING';
+
+// ─── Dictionary 인덱스 ────────────────────────────────────────
+let DICT_MAP          = new Map();
+let DICT_MEANING_MAP  = new Map();
+let MAX_PHRASE_LENGTH = 1;
 
 const SESSION_ID  = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 const input       = document.getElementById('userInput');
@@ -22,9 +22,72 @@ const header      = document.getElementById('header');
 const history     = document.getElementById('chat-history');
 const modal       = document.getElementById('modal-overlay');
 let msgCount      = 0;
-let sessionLogs   = [];   // MindWorld detectRole()용 세션 로그
+let sessionLogs   = [];
 
-// ─── 감정 점수 (rawScore, 0~10 스케일) ────────────────────────
+// ─── 날짜별 localStorage 키 ───────────────────────────────────
+function getTodayKey() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, '0');
+    const dd   = String(d.getDate()).padStart(2, '0');
+    return `chat_log_${yyyy}-${mm}-${dd}`;
+}
+
+// ─── 대화 저장 ────────────────────────────────────────────────
+function saveChatLog(entry) {
+    const key  = getTodayKey();
+    const logs = JSON.parse(localStorage.getItem(key) || '[]');
+    logs.push(entry);
+    localStorage.setItem(key, JSON.stringify(logs));
+}
+
+// ─── 오늘 대화 불러오기 ───────────────────────────────────────
+function loadTodayChat() {
+    const key  = getTodayKey();
+    const logs = JSON.parse(localStorage.getItem(key) || '[]');
+    return logs;
+}
+
+// ─── 오늘 대화 삭제 ───────────────────────────────────────────
+function clearTodayChat() {
+    if (!confirm('오늘 대화를 삭제할까요?')) return;
+    localStorage.removeItem(getTodayKey());
+    history.innerHTML = '';
+    msgCount    = 0;
+    firstLang   = null;
+    sessionLogs = [];
+    showWelcomeScreen();
+}
+
+// ─── 저장된 대화 복원 ─────────────────────────────────────────
+function restoreChat(logs) {
+    if (!logs || logs.length === 0) return;
+    const wc = document.getElementById('welcome-card');
+    if (wc) wc.remove();
+
+    logs.forEach(entry => {
+        msgCount++;
+        if (msgCount === 1) firstLang = entry.firstLang;
+
+        const isLeft  = entry.isLeft;
+        const pairDiv = document.createElement('div');
+        pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
+        pairDiv.innerHTML = `
+            <div class="box-top">${entry.topHtml}</div>
+            <div class="box-bottom">${entry.original}</div>`;
+        history.appendChild(pairDiv);
+
+        const snap = entry;
+        pairDiv.onclick = () => {
+            trackEvent('card_click', { input: snap.original, output: snap.translated, timestamp: Date.now() });
+            showModal(snap.original, snap.translated, snap.isKorean, snap.checkText);
+        };
+    });
+
+    history.scrollTop = history.scrollHeight;
+}
+
+// ─── 감정 점수 ────────────────────────────────────────────────
 function calcEmotionScore(text) {
     let score = 0;
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
@@ -36,15 +99,43 @@ function calcEmotionScore(text) {
     return Math.max(0, score);
 }
 
+// ─── Dictionary Map 인덱싱 ────────────────────────────────────
+function buildDictionaryIndex() {
+    DICT_MAP.clear();
+    DICT_MEANING_MAP.clear();
+
+    const clean = (str) =>
+        str?.toLowerCase().replace(/[.,!?]/g, '').trim();
+
+    CORE_DICTIONARY.forEach(d => {
+        const standard = clean(d.standard || d.standard_word);
+        const southern = clean(d.southern || d.southern_word);
+        const meaning  = clean(d.meaning  || d.meaning_ko);
+
+        if (standard) DICT_MAP.set(standard, d);
+        if (southern) DICT_MAP.set(southern, d);
+        if (meaning)  DICT_MEANING_MAP.set(meaning, d);
+    });
+
+    MAX_PHRASE_LENGTH = 1;
+    DICT_MAP.forEach((_, key) => {
+        const length = key.split(' ').length;
+        if (length > MAX_PHRASE_LENGTH) MAX_PHRASE_LENGTH = length;
+    });
+
+    console.log('[CoreRing] Dict indexed:', DICT_MAP.size, '| Max phrase length:', MAX_PHRASE_LENGTH);
+}
+
 // ─── 엔진 초기화 ──────────────────────────────────────────────
 async function initEngine() {
     if (engineInitialized) return;
     engineInitialized = true;
     try {
-        const res         = await fetch('/api/get-sheet-dictionary');
-        CORE_DICTIONARY   = await res.json();
+        const res             = await fetch('/api/get-sheet-dictionary');
+        CORE_DICTIONARY       = await res.json();
         const conflictRes     = await fetch('/api/get-conflicts');
         CONFLICT_DICTIONARY   = await conflictRes.json();
+        buildDictionaryIndex();
     } catch (e) {
         console.error('DB Load Failed:', e);
         engineInitialized   = false;
@@ -52,7 +143,8 @@ async function initEngine() {
         CONFLICT_DICTIONARY = [];
     }
 }
-// ─── 웰컴 화면 하드코딩 문장 (즉시 표시용) ─────────────────────
+
+// ─── 웰컴 화면 ───────────────────────────────────────────────
 const WELCOME_PHRASES = [
     { vi: 'Anh yêu em.',           ko: '나는 당신을 사랑해요.' },
     { vi: 'Cảm ơn em rất nhiều.',  ko: '정말 고마워요.' },
@@ -61,7 +153,6 @@ const WELCOME_PHRASES = [
     { vi: 'Em đẹp lắm.',           ko: '당신은 정말 예뻐요.' },
 ];
 
-// ─── 웰컴 화면 렌더 ───────────────────────────────────────────
 function renderWelcomeCard(vi, ko) {
     const historyEl = document.getElementById('chat-history');
     const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
@@ -79,7 +170,12 @@ function renderWelcomeCard(vi, ko) {
         historyEl.appendChild(card);
     }
 
+    const modeTag = currentMode === 'CHAT'
+        ? `<div style="margin-bottom:12px; font-size:10px; letter-spacing:2px; color:#f0b429;">● CHAT MODE</div>`
+        : '';
+
     card.innerHTML = `
+        ${modeTag}
         <div style="font-size:11px; letter-spacing:3px; color:#444; margin-bottom:32px; text-transform:uppercase;">
             ${date} · 오늘의 문장
         </div>
@@ -103,11 +199,9 @@ function renderWelcomeCard(vi, ko) {
     `;
 }
 
-// ─── 웰컴 화면 초기화 ────────────────────────────────────────
 function showWelcomeScreen() {
     const historyEl = document.getElementById('chat-history');
 
-    // 배경 패턴
     historyEl.style.cssText += `
         background-image: repeating-linear-gradient(
             45deg, rgba(255,255,255,0.012) 0px,
@@ -118,12 +212,18 @@ function showWelcomeScreen() {
         );
     `;
 
-    // ① 즉시 - 하드코딩 문장 표시
     const preset = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
     renderWelcomeCard(preset.vi, preset.ko);
 
-    // ② DB 로딩 완료 후 - DB 랜덤 문장으로 교체
     initEngine().then(() => {
+        const savedLogs = loadTodayChat();
+        if (savedLogs.length > 0) {
+            const wc = document.getElementById('welcome-card');
+            if (wc) wc.remove();
+            restoreChat(savedLogs);
+            return;
+        }
+
         const phrases = CORE_DICTIONARY.filter(d =>
             d.entry_type === 'phrase' || (d.standard?.split(' ').length > 1)
         );
@@ -137,6 +237,53 @@ function showWelcomeScreen() {
 }
 
 showWelcomeScreen();
+
+// ─── 모드 전환 ────────────────────────────────────────────────
+function toggleMode() {
+    currentMode = currentMode === 'RING' ? 'CHAT' : 'RING';
+    localStorage.setItem('core_mode', currentMode);
+
+    const label = document.getElementById('mode-label');
+    if (label) label.textContent = currentMode;
+
+    input.placeholder = currentMode === 'RING'
+        ? '심장을 분석합니다...'
+        : '대화를 입력하세요...';
+
+    // 웰컴카드 모드 표시 갱신
+    const preset = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
+    const wc = document.getElementById('welcome-card');
+    if (wc) renderWelcomeCard(preset.vi, preset.ko);
+
+    showModeToast(currentMode);
+}
+
+function showModeToast(mode) {
+    const existing = document.getElementById('mode-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'mode-toast';
+    toast.style.cssText = `
+        position: fixed; top: 70px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(20,20,20,0.95);
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 8px 20px; border-radius: 20px;
+        font-size: 11px; letter-spacing: 2px;
+        color: ${mode === 'CHAT' ? '#f0b429' : '#aaa'};
+        z-index: 999; transition: opacity 0.4s;
+    `;
+    toast.textContent = mode === 'CHAT'
+        ? '● CHAT MODE — 대화 맥락 유지'
+        : '● RING MODE — 단어 분석';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+    setTimeout(() => toast.remove(), 2400);
+}
+
+// ─── 삭제 버튼 ────────────────────────────────────────────────
+document.getElementById('clear-btn').onclick = clearTodayChat;
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
@@ -152,6 +299,63 @@ input.addEventListener('input', () => {
         ? header.classList.add('glow-active')
         : header.classList.remove('glow-active');
 });
+
+// ─── CHAT 모드 처리 ───────────────────────────────────────────
+async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text,
+                history:  sessionLogs.slice(-5),
+                softTone: mw.softTone,
+                role:     mw.role,
+            }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '번역 오류');
+
+        const translated = data.translated;
+
+        let topHtml = translated;
+        if (mw.level === 'HIGH') {
+            topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
+        } else if (mw.level === 'MEDIUM') {
+            topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
+        }
+        if (data.softTone) {
+            topHtml += ' <span class="conflict-badge" style="background:rgba(240,180,41,0.15);color:#f0b429;">💛 순화됨</span>';
+        }
+
+        document.getElementById(`t-${tempId}`).innerHTML = topHtml;
+
+        try { await navigator.clipboard.writeText(translated); } catch {}
+
+        saveChatLog({
+            original:   text,
+            translated,
+            topHtml,
+            isKorean,
+            isLeft,
+            checkText:  translated,
+            firstLang,
+            mode:       'CHAT',
+            timestamp:  Date.now(),
+        });
+
+        sessionLogs.push({ input: text, output: translated, timestamp: Date.now() });
+
+        pairDiv.onclick = () => {
+            showModal(text, translated, isKorean, isKorean ? translated : text);
+        };
+
+    } catch (e) {
+        document.getElementById(`t-${tempId}`).innerText = '번역 오류';
+        console.error('[CoreChat]', e);
+    }
+}
 
 // ─── 메인 번역 처리 ───────────────────────────────────────────
 async function handleSend() {
@@ -171,7 +375,6 @@ async function handleSend() {
     }
     const isLeft = firstLang === 'ko' ? isKorean : !isKorean;
 
-    // UI - 로딩 버블
     const pairDiv = document.createElement('div');
     pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
     pairDiv.innerHTML = `
@@ -182,30 +385,30 @@ async function handleSend() {
     history.appendChild(pairDiv);
     pairDiv.scrollIntoView({ behavior: 'smooth' });
 
+    const rawScore = calcEmotionScore(text);
+    const mw = runMindWorld({ rawScore, inputText: text, sessionLogs });
+
+    // ── 모드 분기 ──
+    if (currentMode === 'CHAT') {
+        await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft);
+        return;
+    }
+
+    // ── RING 모드 (기존 DeepL) ──
     try {
         const target = isKorean ? 'VI' : 'KO';
         const res    = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data   = await res.json();
         const rawTranslation = data.translations[0].text;
 
-        // ① 방언 감지 (dialect.js)
-        const checkText      = isKorean ? rawTranslation : text;
+        const checkText       = isKorean ? rawTranslation : text;
         const detectedDialect = detectDialectScore(checkText);
         const finalDialect    = resolveDialect({ detectedDialect, userLocale });
+        const conflicts       = detectConflicts(checkText, CONFLICT_DICTIONARY);
 
-        // ② 충돌 감지 (conflict.js) - UI 배지용
-        const conflicts = detectConflicts(checkText, CONFLICT_DICTIONARY);
-
-        // ③ 감정 점수 (rawScore 0~10)
-        const rawScore     = calcEmotionScore(text);
-
-        // ④ MindWorld 실행 (mindworld.js)
         const sessionLog = { input: text, output: rawTranslation, timestamp: Date.now() };
         sessionLogs.push(sessionLog);
 
-        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs });
-
-        // ⑤ UI 출력
         let topHtml = rawTranslation;
         if (conflicts.length > 0) {
             topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
@@ -217,19 +420,42 @@ async function handleSend() {
         }
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
-        // ⑥ 자동 데이터셋 저장 (tp_translations - pending)
+        try {
+            await navigator.clipboard.writeText(rawTranslation);
+        } catch {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = rawTranslation;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            } catch {}
+        }
+
+        saveChatLog({
+            original:   text,
+            translated: rawTranslation,
+            topHtml,
+            isKorean,
+            isLeft,
+            checkText,
+            firstLang,
+            mode:      'RING',
+            timestamp: Date.now(),
+        });
+
         autoSaveToDataset({ inputText: text, outputText: rawTranslation, isKorean });
 
-        // ⑦ 로그 저장 (logger.js)
         await saveTranslationLog({
             inputText:      text,
             outputText:     rawTranslation,
             direction:      isKorean ? 'KO→VI' : 'VI→KO',
             detectedDialect,
             finalDialect,
-            emotionScore:   mw.rrp,   // 정규화된 값 저장
+            emotionScore:   mw.rrp,
             sessionId:      SESSION_ID,
-            conflictCount:  conflicts.length
+            conflictCount:  conflicts.length,
         });
 
         trackEvent('translate', {
@@ -239,10 +465,10 @@ async function handleSend() {
             emotionScore: rawScore,
             rrp:          mw.rrp,
             intentState:  mw.intentState,
-            timestamp:    Date.now()
+            mode:         'RING',
+            timestamp:    Date.now(),
         });
 
-        // ⑦ 카드 클릭 → 모달
         pairDiv.onclick = () => {
             trackEvent('card_click', { input: text, output: rawTranslation, timestamp: Date.now() });
             showModal(text, rawTranslation, isKorean, checkText);
@@ -254,48 +480,76 @@ async function handleSend() {
     }
 }
 
+// ─── 베트남어 Dynamic Longest-Match 토크나이저 ────────────────
+function tokenizeVietnamese(text) {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const tokens = [];
+    const clean = (str) => str.replace(/[.,!?]/g, '').toLowerCase();
+
+    let i = 0;
+    while (i < words.length) {
+        let matched = false;
+        const maxTry = Math.min(MAX_PHRASE_LENGTH, words.length - i);
+
+        for (let size = maxTry; size > 0; size--) {
+            const slice = words.slice(i, i + size).map(w => clean(w)).join(' ');
+            if (DICT_MAP.has(slice)) {
+                tokens.push(words.slice(i, i + size).join(' '));
+                i += size;
+                matched = true;
+                break;
+            }
+        }
+
+        if (!matched) { tokens.push(words[i]); i++; }
+    }
+    return tokens;
+}
+
 // ─── 단어 카드 모달 ───────────────────────────────────────────
 function showModal(original, translated, isKorean, cardText) {
     let chunkHtml = '';
-    const words = cardText.split(/\s+/).filter(w => w.length > 0);
+    const words = tokenizeVietnamese(cardText);
+
+    const sentenceCard = `
+        <div class="chunk-card sentence-unit">
+            <div class="chunk-header">
+                <span class="chunk-v">${translated}</span>
+            </div>
+            <span class="chunk-k">${original}</span>
+        </div>
+    `;
 
     words.forEach(word => {
         const cleanWord = word.replace(/[.,!?]/g, '');
         if (!cleanWord) return;
 
         const clean = cleanWord.toLowerCase();
-        const found =
-            // ① 완전 일치 (standard / southern)
-            CORE_DICTIONARY.find(d =>
-                d.standard?.toLowerCase() === clean ||
-                d.southern?.toLowerCase() === clean
-            ) ||
-            // ② 부분 매칭 (standard / southern)
-            CORE_DICTIONARY.find(d =>
-                d.standard?.toLowerCase().includes(clean) ||
-                d.southern?.toLowerCase().includes(clean)
-            ) ||
-            // ③ meaning 역방향 검색 (한국어 의미로 찾기)
-            CORE_DICTIONARY.find(d =>
-                d.meaning?.toLowerCase().includes(clean)
-            );
-        const isDifferent = found &&
-            found.standard?.toLowerCase() !== found.southern?.toLowerCase();
+        const found = DICT_MAP.get(clean) || DICT_MEANING_MAP.get(clean);
+        if (!found) return;
+        if (found.entry_type === 'auxiliary') return;
+
+        const standard = found.standard || found.standard_word || cleanWord;
+        const southern = found.southern || found.southern_word || cleanWord;
+        const hasDialectDiff = standard.toLowerCase() !== southern.toLowerCase();
+
+        let typeClass = '';
+        if (found.entry_type === 'phrase') typeClass = 'type-phrase';
 
         chunkHtml += `
-            <div class="chunk-card ${isDifferent ? 'dialect-card' : ''}">
-                <span class="chunk-v">${cleanWord}</span>
-                ${found ? `
-                    <span class="chunk-north">북부: ${found.standard || cleanWord}</span>
-                    <span class="chunk-south ${isDifferent ? 'dialect-diff' : ''}">
-                        남부: ${found.southern || cleanWord}
-                    </span>
-                    <span class="chunk-k">${found.meaning || '—'}</span>
-                ` : `<span class="chunk-k">—</span>`}
-            </div>`;
+            <div class="chunk-card ${typeClass} ${hasDialectDiff ? 'dialect-card' : ''}">
+                <div class="chunk-header">
+                    <span class="chunk-v">${cleanWord}</span>
+                </div>
+                <span class="chunk-north">북부: ${standard}</span>
+                <span class="chunk-south ${hasDialectDiff ? 'dialect-diff' : ''}">
+                    남부: ${southern}
+                </span>
+                <span class="chunk-k">${found.meaning || found.meaning_ko || '—'}</span>
+            </div>
+        `;
     });
 
-    // 충돌 단어 카드 (conflict.js)
     detectConflicts(isKorean ? translated : original, CONFLICT_DICTIONARY)
         .forEach(item => {
             chunkHtml += `
@@ -309,12 +563,10 @@ function showModal(original, translated, isKorean, cardText) {
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
     document.getElementById('modal-body').innerHTML = `
-        <div class="modal-header-text">
-            <div class="modal-translated">${translated}</div>
-            <div class="modal-original">${original}</div>
-        </div>
+        <div class="modal-sentence-area">${sentenceCard}</div>
         <div class="modal-divider"></div>
-        <div class="chunk-grid">${chunkHtml}</div>`;
+        <div class="chunk-grid">${chunkHtml}</div>
+    `;
     modal.style.display = 'flex';
 }
 
