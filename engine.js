@@ -283,7 +283,11 @@ function showModeToast(mode) {
 }
 
 // ─── 삭제 버튼 ────────────────────────────────────────────────
-document.getElementById('clear-btn').onclick = clearTodayChat;
+const clearBtn = document.getElementById('clear-btn');
+if (clearBtn) clearBtn.onclick = clearTodayChat;
+
+const modeToggle = document.getElementById('mode-toggle');
+if (modeToggle) modeToggle.onclick = toggleMode;
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
