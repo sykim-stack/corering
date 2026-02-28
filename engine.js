@@ -282,12 +282,19 @@ function showModeToast(mode) {
     setTimeout(() => toast.remove(), 2400);
 }
 
-// ─── 삭제 버튼 ────────────────────────────────────────────────
-const clearBtn = document.getElementById('clear-btn');
-if (clearBtn) clearBtn.onclick = clearTodayChat;
-
+// ─── 이벤트 핸들러 ────────────────────────────────────────────
+const clearBtn   = document.getElementById('clear-btn');
+const sendBtn    = document.getElementById('send-btn');
+const modalClose = document.getElementById('modal-close');
 const modeToggle = document.getElementById('mode-toggle');
+
+if (clearBtn)   clearBtn.onclick   = clearTodayChat;
 if (modeToggle) modeToggle.onclick = toggleMode;
+if (sendBtn)    sendBtn.onclick    = handleSend;
+if (modalClose) modalClose.onclick = () => modal.style.display = 'none';
+
+input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
