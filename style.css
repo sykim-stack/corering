@@ -1,9 +1,3 @@
-/* ============================================================
-   BRAINPOOL | CoreRing Global Style v1.3
-   - 가독성 최적화: 시니어 사용자를 위한 거대 텍스트 및 고대비 적용
-   - 제작: HajunAI (관제탑)
-   ============================================================ */
-
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Be+Vietnam+Pro:wght@400;700;800&display=swap');
 
 :root {
@@ -13,17 +7,12 @@
     --core-dark: #444;
     --surface: #111;
     --surface2: #181818;
-    --border: #262626; /* 조금 더 밝게 조정 */
-    --muted: #AAA;      /* 기존보다 밝게 */
-    --muted2: #E0E0E0;     /* 서브 텍스트 가독성을 위해 대폭 밝게 (16pt 대응) */
+    --border: #222;
+    --muted: #555;
+    --muted2: #888;
 }
 
-/* 기초 설정 */
-* { 
-    box-sizing: border-box; 
-    outline: none; 
-    -webkit-tap-highlight-color: transparent; 
-}
+* { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
 
 body {
     background: var(--bg);
@@ -34,7 +23,6 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    line-height: 1.5;
 }
 
 /* ── 헤더 ── */
@@ -76,7 +64,7 @@ header {
 .m-dot { width: 3px; }
 .m-dash { width: 13px; }
 
-/* 심장 박동 애니메이션 */
+/* 심장 박동 */
 @keyframes heartBeat {
     0%  { transform: scale(1);   filter: drop-shadow(0 0 1px var(--gold)); }
     14% { transform: scale(1.3); filter: drop-shadow(0 0 8px var(--gold)); }
@@ -89,14 +77,14 @@ header {
     animation: heartBeat 1.2s infinite;
 }
 
-/* ── 채팅 메인 (말풍선 영역) ── */
+/* ── 채팅 메인 ── */
 main {
     flex: 1;
     overflow-y: auto;
     padding: 20px 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px; /* 카드 간격 확장 */
+    gap: 16px;
 }
 
 main::-webkit-scrollbar { width: 0; }
@@ -104,142 +92,173 @@ main::-webkit-scrollbar { width: 0; }
 .msg-pair {
     display: flex;
     flex-direction: column;
-    width: 85%; /* 조금 더 넓게 */
+    width: 82%;
     background: var(--surface);
-    border-radius: 24px;
-    padding: 20px 24px;
+    border-radius: 20px;
+    padding: 18px 20px;
     border: 1px solid var(--border);
     cursor: pointer;
     transition: border-color 0.2s, transform 0.15s;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .msg-pair:active { transform: scale(0.98); }
-.pair-left  { align-self: flex-start; border-bottom-left-radius: 8px; }
+.msg-pair:hover { border-color: #333; }
 
-/* 오른쪽 카드 (사용자 입력 베트남어) - 밝은 UI */
-.pair-right { 
-    align-self: flex-end;   
-    border-bottom-right-radius: 8px; 
-    background: #ffffff;
-    border-color: #e0e0e0;
-    text-align: right;
-}
+.pair-left  { align-self: flex-start; border-bottom-left-radius: 6px; }
+.pair-right { align-self: flex-end;   border-bottom-right-radius: 6px; }
 
-/* 메인 큰 텍스트 (번역결과) - 22~24pt 대응 */
 .box-top {
     color: var(--white);
-    font-size: 1.6rem; 
+    font-size: 1.35rem;
     font-weight: 800;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     white-space: pre-wrap;
-    line-height: 1.35;
+    line-height: 1.45;
     font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
-    letter-spacing: -0.5px;
 }
 
-.pair-right .box-top { color: #000; }
-
-/* 서브 텍스트 (원문/발음) - 16pt 대응 및 밝기 상향 */
 .box-bottom {
     color: var(--muted2);
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     white-space: pre-wrap;
     line-height: 1.5;
-    font-weight: 500;
 }
 
-.pair-right .box-bottom { color: #555; font-weight: 700; }
+/* 로딩 점 */
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+}
+.loading-dots span {
+    animation: blink 1.4s infinite;
+    color: var(--gold);
+    font-size: 1.8rem;
+    font-weight: 900;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-/* ── 모달 (상세 정보) ── */
+/* ── 모달 ── */
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.94);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     display: none;
-    align-items: center; /* 중앙 정렬 */
+    align-items: flex-end;
     justify-content: center;
     z-index: 2000;
-    padding: 20px;
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 .modal-content {
     width: 100%;
     max-width: 480px;
-    padding: 32px 24px;
-    background: #0f0f0f;
-    border-radius: 32px;
-    border: 1px solid #333;
-    max-height: 85vh;
+    padding: 28px 20px 20px;
+    background: #0a0a0a;
+    border-radius: 28px 28px 0 0;
+    border-top: 1px solid #222;
+    max-height: 80vh;
     overflow-y: auto;
 }
 
+.modal-content::-webkit-scrollbar { width: 0; }
+
+.modal-header-text { margin-bottom: 4px; }
+
 .modal-translated {
-    font-size: 1.8rem;
-    font-weight: 900;
+    font-size: 1.5rem;
+    font-weight: 800;
     color: var(--white);
-    line-height: 1.3;
-    margin-bottom: 12px;
+    line-height: 1.4;
+    margin-bottom: 6px;
+    font-family: 'Be Vietnam Pro', sans-serif;
 }
 
 .modal-original {
-    font-size: 1.2rem;
+    font-size: 1rem;
     color: var(--muted2);
     line-height: 1.5;
-    margin-bottom: 24px;
+}
+
+.modal-label {
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 700;
 }
 
 .modal-divider {
     height: 1px;
-    background: #222;
-    margin: 24px 0;
+    background: var(--border);
+    margin: 20px 0;
 }
 
 /* 단어 카드 그리드 */
 .chunk-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 30px;
+    gap: 10px;
+    margin-bottom: 24px;
 }
 
 .chunk-card {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 18px 14px;
+    border-radius: 16px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    transition: border-color 0.2s;
 }
+
+.chunk-card:active { border-color: var(--gold); }
 
 .chunk-v {
     color: var(--white);
-    font-size: 1.35rem;
+    font-size: 1.1rem;
     font-weight: 800;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.3;
+    font-family: 'Be Vietnam Pro', sans-serif;
 }
 
 .chunk-k {
-    color: #BBB;
-    font-size: 1.05rem;
+    color: var(--muted2);
+    font-size: 0.82rem;
     text-align: center;
     line-height: 1.4;
 }
 
-/* 방언 및 특수 표시 */
-.chunk-north, .chunk-south { font-size: 12px; color: #888; display: block; margin-top: 4px; }
-.dialect-diff { color: #f5a623 !important; font-weight: 700; }
-.dialect-card { border: 1.5px solid #f5a623; }
+/* 확인 버튼 */
+#modal-close {
+    width: 100%;
+    height: 54px;
+    background: var(--white);
+    color: #000;
+    border: none;
+    border-radius: 16px;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: opacity 0.15s;
+    letter-spacing: -0.3px;
+}
 
-/* ── 푸터 (입력창) ── */
+#modal-close:active { opacity: 0.85; }
+
+/* ── 푸터 ── */
 footer {
-    padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+    padding: 12px 16px calc(20px + env(safe-area-inset-bottom));
     display: flex;
-    gap: 12px;
+    gap: 10px;
     background: var(--bg);
     border-top: 1px solid #111;
     flex-shrink: 0;
@@ -247,61 +266,74 @@ footer {
 
 .input-box {
     flex: 1;
-    height: 62px; /* 더 높게 */
+    height: 52px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: 16px;
     color: var(--white);
-    padding: 0 20px;
-    font-size: 1.2rem; /* 입력할 때도 크게 */
+    padding: 0 16px;
+    font-size: 1rem;
     font-family: 'Noto Sans KR', sans-serif;
+    transition: border-color 0.2s;
 }
 
+.input-box:focus { border-color: #333; }
+.input-box::placeholder { color: var(--muted); }
+
 .btn-send {
-    width: 62px;
-    height: 62px;
+    width: 52px;
+    height: 52px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: 16px;
     color: var(--white);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.2s, border-color 0.2s;
     flex-shrink: 0;
 }
 
-.btn-send svg { width: 28px; height: 28px; }
-
-/* 로딩 애니메이션 */
-@keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
-.loading-dots span {
-    animation: blink 1.4s infinite;
-    color: var(--gold);
-    font-size: 2rem;
-    font-weight: 900;
+.btn-send:active {
+    background: #1a1a1a;
+    border-color: #444;
 }
-.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-/* 기타 공통 스타일 */
-.modal-label {
-    font-size: 0.8rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-    font-weight: 700;
+/* pair-right (베트남어 입력) - 흰색 카드 */
+.pair-right {
+    background: #ffffff;
+    border-color: #e0e0e0;
+    text-align: right;
 }
 
-#modal-close {
-    width: 100%;
-    height: 60px;
-    background: var(--white);
-    color: #000;
-    border: none;
-    border-radius: 18px;
-    font-weight: 800;
-    font-size: 1.1rem;
-    cursor: pointer;
+.pair-right .box-top {
+    color: #000000;
 }
+
+.pair-right .box-bottom {
+    color: #666666;
+}
+/* 뜻 없는 단어 - 회색 흐리게 */
+.chunk-empty {
+    color: #333333;
+    font-style: italic;
+}
+
+/* 모달 중앙 정렬 */
+.modal-overlay {
+    align-items: center !important;
+}
+
+.modal-content {
+    border-radius: 28px !important;
+    max-height: 85vh;
+}
+
+.chunk-north { font-size: 11px; color: #888; display: block; }
+.chunk-south { font-size: 11px; color: #888; display: block; }
+.dialect-diff { color: #f5a623 !important; } /* 남부 방언 다를 때 강조 */
+.dialect-card { border: 1px solid #f5a623; } /* 방언 차이 카드 테두리 */
+
+
+
+
