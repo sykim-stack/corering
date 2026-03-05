@@ -1,7 +1,7 @@
 // ============================================================
-// BRAINPOOL | CoreRing install.js v1.5 (Smart Direct Install)
+// BRAINPOOL | CoreRing install.js v1.6 (Google Search Fix)
 // - 담당: HajunAI (관제탑)
-// - 원칙: 가능한 경우 안내창 없이 즉시 공식 설치 팝업 호출
+// - 패치: 안드로이드 인텐트 주소 정규화 (구글 검색 현상 해결)
 // ============================================================
 
 (function() {
@@ -10,18 +10,25 @@
     const isAndroid = UA.indexOf('android') !== -1;
     const isIOS = /iphone|ipad|ipod/.test(UA);
 
-    // ─── 1단계: 카카오톡 탈출 (무한루프 방지) ──────────────────
+    // ─── 1단계: 카카오톡 탈출 로직 (정밀 수정) ──────────────────
     if (isKakao) {
         const hasAttempted = sessionStorage.getItem('kakao_escape');
+        
         if (!hasAttempted) {
             sessionStorage.setItem('kakao_escape', 'true');
+            
             if (isAndroid) {
-                location.href = "intent://" + location.host + location.pathname + location.search + "#Intent;scheme=https;package=com.android.chrome;end";
+                // [CRITICAL FIX] https://를 제거한 순수 호스트+경로만 추출
+                // intent://corering.vercel.app/... 형식이 되어야 구글 검색으로 안 갑니다.
+                const cleanUrl = window.location.href.replace(/https?:\/\//, "");
+                const chromeIntent = "intent://" + cleanUrl + "#Intent;scheme=https;package=com.android.chrome;end";
+                
+                location.href = chromeIntent;
             } else if (isIOS) {
                 window.addEventListener('load', showKakaoSafariGuide);
             }
         } else {
-            // 탈출 실패 후 카톡 잔류 시 안내창만 노출
+            // 탈출 실패 시 수동 안내
             window.addEventListener('load', showKakaoSafariGuide);
         }
     }
@@ -29,17 +36,13 @@
     // ─── 2단계: PWA 설치 엔진 ──────────────────────────────────
     let deferredPrompt = null;
 
-    // 서비스 워커 등록
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
     }
 
-    // 크롬/안드로이드용 공식 설치 이벤트 캐치
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        
-        // 버튼을 활성화 상태로 표시
         const btn = document.getElementById('install-btn');
         if (btn) {
             btn.style.display = 'block';
@@ -47,39 +50,33 @@
         }
     });
 
-    // 설치 버튼 클릭 핸들러
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('#install-btn');
         if (btn) handleSmartInstall();
     });
 
     async function handleSmartInstall() {
-        // 이미 앱으로 실행 중이면 종료
         if (window.matchMedia('(display-mode: standalone)').matches) {
             showInstallToast('✅ 이미 앱이 설치되어 있습니다.');
             return;
         }
 
-        // [CASE 1] 크롬/안드로이드: 안내창 없이 바로 공식 팝업 실행
+        // [크롬/안드로이드] 바로 설치 팝업
         if (deferredPrompt) {
             try {
-                deferredPrompt.prompt(); // 브라우저 공식 팝업 등장
+                deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    showInstallToast('설치를 시작합니다!');
-                }
-            } catch (err) {
-                console.error("Install prompt failed", err);
-            }
-            deferredPrompt = null; // 1회 사용 후 초기화
+                if (outcome === 'accepted') showInstallToast('설치를 시작합니다!');
+            } catch (err) { console.error(err); }
+            deferredPrompt = null;
             return;
         }
 
-        // [CASE 2] 아이폰/기타: 어쩔 수 없는 경우에만 안내창 표시
+        // [아이폰/기타] 수동 안내창
         showInstallGuideModal();
     }
 
-    // ─── 3단계: UI 컴포넌트 (꼭 필요한 경우에만 노출) ──────────
+    // ─── 3단계: UI 컴포넌트 ──────────────────────────────────
 
     function showKakaoSafariGuide() {
         if (document.getElementById('kakao-guide-overlay')) return;
@@ -101,7 +98,6 @@
     function showInstallGuideModal() {
         const existing = document.getElementById('install-guide-modal');
         if (existing) existing.remove();
-
         const guideHtml = isIOS ? 
             `<div class="step">① Safari 하단 <b>공유(↑)</b> 클릭</div><div class="step">② <b>홈 화면에 추가</b> 선택</div><div class="step">③ 우측 상단 <b>추가</b> 클릭</div>` : 
             `<div class="step">① 브라우저 <b>메뉴(⋮)</b> 클릭</div><div class="step">② <b>홈 화면에 추가</b> 선택</div>`;
