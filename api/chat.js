@@ -1,11 +1,17 @@
-const { text, history = [], softTone = false, role = 'unknown', dialect = 'vi_south' } = req.body;
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-const dialectGuide =
-    dialect === 'vi_north'   ? '베트남 북부(하노이) 구어체 기준으로 번역.' :
-    dialect === 'vi_south'   ? '베트남 남부(호치민) 구어체 기준으로 번역.' :
-    '표준 베트남어 기준으로 번역.';
+    const { text, history = [], softTone = false, role = 'unknown', dialect = 'vi_south' } = req.body;
+    if (!text) return res.status(400).json({ error: 'text is required' });
 
-const SYSTEM_PROMPT = `
+    const dialectGuide =
+        dialect === 'vi_north' ? '베트남 북부(하노이) 구어체 기준으로 번역.' :
+        dialect === 'vi_south' ? '베트남 남부(호치민) 구어체 기준으로 번역.' :
+        '표준 베트남어 기준으로 번역.';
+
+    const SYSTEM_PROMPT = `
 당신은 한국-베트남 부부 통역사입니다.
 ${dialectGuide}
 
@@ -16,16 +22,8 @@ ${dialectGuide}
 4. 한 줄로만 출력.
 `.trim();
 
-export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    const { text, history = [], softTone = false, role = 'unknown' } = req.body;
-    if (!text) return res.status(400).json({ error: 'text is required' });
-
-    const isKorean  = /[ㄱ-ㅎ|가-힣]/.test(text);
-    const direction = isKorean ? 'KO→VI' : 'VI→KO';
+    const isKorean   = /[ㄱ-ㅎ|가-힣]/.test(text);
+    const direction  = isKorean ? 'KO→VI' : 'VI→KO';
     const targetLang = isKorean ? '베트남어' : '한국어';
 
     const toneGuide = softTone
@@ -62,7 +60,7 @@ export default async function handler(req, res) {
                     },
                 }),
             }
-        ); 
+        );
 
         if (!geminiRes.ok) {
             const err = await geminiRes.json();
