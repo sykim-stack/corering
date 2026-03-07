@@ -322,6 +322,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
                 history:  sessionLogs.slice(-5),
                 softTone: mw.softTone,
                 role:     mw.role,
+                dialect:  userLocale || 'vi_south',
             }),
         });
 
@@ -358,6 +359,21 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
 
         sessionLogs.push({ input: text, output: translated, timestamp: Date.now() });
 
+        // corechat 로그 저장
+        fetch('/api/corechat-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source_locale:    isKorean ? 'ko' : 'vi',
+                target_locale:    isKorean ? 'vi' : 'ko',
+                input_text:       text,
+                output_text:      translated,
+                engine_used:      'gemini',
+                emotion_score:    mw?.rrp ?? null,
+                conflict_detected: mw?.level === 'HIGH',
+            }),
+        }).catch(() => {});
+
         pairDiv.onclick = () => {
             showModal(text, translated, isKorean, isKorean ? translated : text);
         };
@@ -367,7 +383,6 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
         console.error('[CoreChat]', e);
     }
 }
-
 // ─── 메인 번역 처리 ───────────────────────────────────────────
 async function handleSend() {
     const text = input.value.trim();
