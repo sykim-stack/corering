@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         }
 
         const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/translation_logs?select=id`,
+            `${SUPABASE_URL}/rest/v1/translation_logs`,
             {
                 method: 'POST',
                 headers: {
@@ -31,7 +31,8 @@ export default async function handler(req, res) {
                     'Authorization': `Bearer ${SUPABASE_KEY}`,
                     'Content-Type': 'application/json',
                     'Prefer': 'return=minimal',
-                    'Accept-Profile': 'corechat'
+                    'Accept-Profile': 'corechat',
+                    'Content-Profile': 'corechat'
                 },
                 body: JSON.stringify({
                     user_id: user_id || null,
