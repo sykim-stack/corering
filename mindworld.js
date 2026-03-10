@@ -94,14 +94,13 @@ function analyzeIntent({ inputText, conflicts = [], rawScore = 0, intentState = 
         }
     }
 // 2차: 충돌 단어 가중 보정
-// meaning_flip + high severity 인 경우에만 적용 (방언 차이는 제외)
 const meaningFlipConflicts = conflicts.filter(
     c => c.conflict_type === 'meaning_flip' && c.severity === 'high'
 );
-    if (conflicts.length > 0) {
-        if (detected === 'NEUTRAL')        detected = 'COMPLAINT';
-        else if (detected === 'COMPLAINT') detected = 'THREAT';
-    }
+if (meaningFlipConflicts.length > 0) {    // ← 이걸로 바꾸세요
+    if (detected === 'NEUTRAL')        detected = 'COMPLAINT';
+    else if (detected === 'COMPLAINT') detected = 'THREAT';
+}
 
     if (intentState === 'CONFLICT' && detected === 'NEUTRAL') {
         detected = 'COMPLAINT';
