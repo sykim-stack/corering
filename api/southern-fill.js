@@ -1,6 +1,6 @@
 // ============================================================
-// BRAINPOOL | CoreRing api/southern-fill.js v1.1
-// v1.1: supabase.raw 제거 → JS 필터 방식으로 변경
+// BRAINPOOL | CoreRing api/southern-fill.js v1.2
+// v1.2: 배치 대기시간 증가 (500ms→1500ms), 실패 배치 1회 재시도
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -10,7 +10,9 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE  = 10;
+const BATCH_DELAY = 1500;  // 배치 간 대기 (ms)
+const RETRY_DELAY = 3000;  // 재시도 대기 (ms)
 
 async function askGeminiSouthern(words) {
     const wordList = words.map((w, i) => `${i + 1}. ${w}`).join('\n');
@@ -59,13 +61,50 @@ ${wordList}
     return JSON.parse(clean);
 }
 
+async function processBatch(batch) {
+    const words = batch.map(r => r.standard_word);
+
+    // 1차 시도
+    let southernWords;
+    try {
+        southernWords = await askGeminiSouthern(words);
+    } catch (e) {
+        // 실패 시 RETRY_DELAY 후 1회 재시도
+        console.log(`[southern-fill] 재시도 대기 ${RETRY_DELAY}ms...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY));
+        southernWords = await askGeminiSouthern(words);  // 여기서도 실패하면 throw
+    }
+
+    const errors  = [];
+    let   updated = 0;
+
+    for (let j = 0; j < batch.length; j++) {
+        const southernWord = southernWords[j] || batch[j].standard_word;
+
+        const { error: updateErr } = await supabase
+            .from('tp_translations')
+            .update({
+                southern_word: southernWord.trim(),
+                status:        'approved',
+            })
+            .eq('id', batch[j].id);
+
+        if (updateErr) {
+            errors.push({ id: batch[j].id, error: updateErr.message });
+        } else {
+            updated++;
+        }
+    }
+
+    return { updated, errors };
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
     try {
-        // ① pending 데이터 조회 → JS에서 southern_word = standard_word 필터
         const { data: rows, error: fetchErr } = await supabase
             .from('tp_translations')
             .select('id, standard_word, southern_word')
@@ -78,7 +117,6 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: '처리할 데이터 없음', updated: 0 });
         }
 
-        // southern_word = standard_word 인 것만 필터 (JS에서)
         const targets = rows.filter(r => r.southern_word === r.standard_word);
 
         if (targets.length === 0) {
@@ -86,44 +124,25 @@ export default async function handler(req, res) {
         }
 
         let totalUpdated = 0;
-        const errors     = [];
+        const allErrors  = [];
 
-        // ② 10개씩 배치 처리
         for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-            const batch = targets.slice(i, i + BATCH_SIZE);
-            const words = batch.map(r => r.standard_word);
+            const batch      = targets.slice(i, i + BATCH_SIZE);
+            const batchNum   = Math.floor(i / BATCH_SIZE) + 1;
 
             try {
-                const southernWords = await askGeminiSouthern(words);
+                const { updated, errors } = await processBatch(batch);
+                totalUpdated += updated;
+                if (errors.length > 0) allErrors.push(...errors);
+                console.log(`[southern-fill] 배치 ${batchNum} 완료: ${updated}개`);
+            } catch (e) {
+                console.error(`[southern-fill] 배치 ${batchNum} 최종 실패:`, e.message);
+                allErrors.push({ batch: batchNum, error: e.message });
+            }
 
-                // ③ 각 단어 업데이트
-                for (let j = 0; j < batch.length; j++) {
-                    const southernWord = southernWords[j] || batch[j].standard_word;
-
-                    const { error: updateErr } = await supabase
-                        .from('tp_translations')
-                        .update({
-                            southern_word: southernWord.trim(),
-                            status:        'approved',
-                        })
-                        .eq('id', batch[j].id);
-
-                    if (updateErr) {
-                        errors.push({ id: batch[j].id, error: updateErr.message });
-                    } else {
-                        totalUpdated++;
-                    }
-                }
-
-                console.log(`[southern-fill] 배치 ${i / BATCH_SIZE + 1} 완료: ${batch.length}개`);
-
-                if (i + BATCH_SIZE < targets.length) {
-                    await new Promise(r => setTimeout(r, 500));
-                }
-
-            } catch (batchErr) {
-                console.error(`[southern-fill] 배치 오류:`, batchErr.message);
-                errors.push({ batch: i / BATCH_SIZE + 1, error: batchErr.message });
+            // 다음 배치 전 대기
+            if (i + BATCH_SIZE < targets.length) {
+                await new Promise(r => setTimeout(r, BATCH_DELAY));
             }
         }
 
@@ -131,7 +150,7 @@ export default async function handler(req, res) {
             message: '완료',
             total:   targets.length,
             updated: totalUpdated,
-            errors:  errors.length > 0 ? errors : undefined,
+            errors:  allErrors.length > 0 ? allErrors : undefined,
         });
 
     } catch (e) {
