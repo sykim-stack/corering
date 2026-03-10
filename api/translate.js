@@ -1,17 +1,17 @@
 // ============================================================
 // BRAINPOOL | CoreRing translate.js v2.1
 // DB 우선 조회 → 미스 시 DeepL 호출
-// v2.1: ES module → CommonJS (require) 방식으로 변경
+// v2.1: ES module (import) 방식
 // ============================================================
 
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     const { text, target } = req.query;
@@ -76,4 +76,4 @@ module.exports = async function handler(req, res) {
     } catch (error) {
         return res.status(500).json({ error: 'DeepL 통신 실패' });
     }
-};
+}
