@@ -1,13 +1,14 @@
 // ============================================================
-// BRAINPOOL | CoreRing api/pipeline.js v2.0
-// 실제 컬럼명 기준 수정: standard_word, meaning_ko
+// BRAINPOOL | CoreRing api/pipeline.js v2.1
+// 자동 데이터셋 파이프라인
+// v2.1: 환경변수명 수정 SUPABASE_SERVICE_KEY → SUPABASE_SERVICE_ROLE_KEY
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
+    process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 export default async function handler(req, res) {
