@@ -1,11 +1,12 @@
 // ============================================================
-// BRAINPOOL | CoreRing Engine v3.5
+// BRAINPOOL | CoreRing Engine v3.6
 // RING 모드: DeepL 번역 + 단어 카드
 // CHAT 모드: Gemini 멀티턴 + 국제결혼 특화
 //
-// v3.5 수정사항:
-//   - showModal(): cardText 기준으로 충돌 감지 통일
-//   - handleChatMode(): 충돌 감지 + 배지 표시 추가
+// v3.6 수정사항:
+//   - runMindWorld()에 conflicts 전달 (의도 분석 정확도 향상)
+//   - RING/CHAT 모드 모두 intent 배지 추가
+//   - saveTranslationLog()에 intent, intentConf 전달
 // ============================================================
 
 let CORE_DICTIONARY     = [];
@@ -30,7 +31,7 @@ let sessionLogs   = [];
 
 // ─── 날짜별 localStorage 키 ───────────────────────────────────
 function getTodayKey() {
-    const d = new Date();
+    const d    = new Date();
     const yyyy = d.getFullYear();
     const mm   = String(d.getMonth() + 1).padStart(2, '0');
     const dd   = String(d.getDate()).padStart(2, '0');
@@ -285,20 +286,6 @@ function showModeToast(mode) {
     setTimeout(() => toast.remove(), 2400);
 }
 
-// ─── 이벤트 핸들러 ────────────────────────────────────────────
-const clearBtn   = document.getElementById('clear-btn');
-const sendBtn    = document.getElementById('send-btn');
-const modalClose = document.getElementById('modal-close');
-const modeToggle = document.getElementById('mode-toggle');
-
-if (clearBtn)   clearBtn.onclick   = clearTodayChat;
-if (modeToggle) modeToggle.onclick = toggleMode;
-if (sendBtn)    sendBtn.onclick    = handleSend;
-if (modalClose) modalClose.onclick = () => modal.style.display = 'none';
-
-input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
-
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
 function trackEvent(type, data) {
     const payload = { type, ...data };
@@ -313,6 +300,21 @@ input.addEventListener('input', () => {
         ? header.classList.add('glow-active')
         : header.classList.remove('glow-active');
 });
+
+// ─── 의도 배지 생성 헬퍼 ─────────────────────────────────────
+// RING/CHAT 모드 공통 사용
+function buildIntentBadge(intent) {
+    if (intent === 'THREAT') {
+        return ' <span class="conflict-badge risk-badge">⚡ 강한 불만</span>';
+    }
+    if (intent === 'COMPLAINT') {
+        return ' <span class="conflict-badge risk-badge risk-medium">💬 불만 감지</span>';
+    }
+    if (intent === 'AFFECTION') {
+        return ' <span class="conflict-badge affection-badge">💙 애정 표현</span>';
+    }
+    return '';
+}
 
 // ─── CHAT 모드 처리 ───────────────────────────────────────────
 async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
@@ -334,33 +336,36 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
 
         const translated = data.translated;
 
-        // ✅ 수정: CHAT 모드도 충돌 감지 추가
-        // KO→VI: 번역 결과(베트남어)에서 충돌 체크
-        // VI→KO: 입력 원문(베트남어)에서 충돌 체크
         const checkText = isKorean ? translated : text;
         const conflicts = detectConflicts(checkText, CONFLICT_DICTIONARY);
 
+        // ── v3.6: conflicts를 runMindWorld에 전달해 intent 재계산 ──
+        const mwFinal = runMindWorld({ rawScore: calcEmotionScore(text), inputText: text, sessionLogs, conflicts });
+
         let topHtml = translated;
 
-        // 충돌 배지 (severity 기준)
+        // 충돌 배지
         if (conflicts.length > 0) {
             const hasHigh = conflicts.some(c => c.severity === 'high');
-            if (hasHigh) {
-                topHtml += ' <span class="conflict-badge">🔴 방언 주의</span>';
-            } else {
-                topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
-            }
+            topHtml += hasHigh
+                ? ' <span class="conflict-badge">🔴 방언 주의</span>'
+                : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
         }
 
-        // 감정 배지
-        if (mw.level === 'HIGH') {
+        // 갈등 레벨 배지
+        if (mwFinal.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
-        } else if (mw.level === 'MEDIUM') {
+        } else if (mwFinal.level === 'MEDIUM') {
             topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
         }
+
+        // 순화 배지
         if (data.softTone) {
             topHtml += ' <span class="conflict-badge" style="background:rgba(240,180,41,0.15);color:#f0b429;">💛 순화됨</span>';
         }
+
+        // ── v3.6 신규: 의도 배지 ──
+        topHtml += buildIntentBadge(mwFinal.intent);
 
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
@@ -378,9 +383,8 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
             timestamp:  Date.now(),
         });
 
-        sessionLogs.push({ input: text, output: translated, timestamp: Date.now() });
+        sessionLogs.push({ input: text, output: translated, rawScore: calcEmotionScore(text), timestamp: Date.now() });
 
-        // corechat 로그 저장
         fetch('/api/corechat-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -390,8 +394,10 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
                 input_text:        text,
                 output_text:       translated,
                 engine_used:       'gemini',
-                emotion_score:     mw?.rrp ?? null,
+                emotion_score:     mwFinal?.rrp ?? null,
                 conflict_detected: conflicts.length > 0,
+                intent:            mwFinal.intent,
+                intent_conf:       mwFinal.confidence,
             }),
         }).catch(() => {});
 
@@ -434,49 +440,52 @@ async function handleSend() {
     pairDiv.scrollIntoView({ behavior: 'smooth' });
 
     const rawScore = calcEmotionScore(text);
-    const mw = runMindWorld({ rawScore, inputText: text, sessionLogs });
 
     // ── 모드 분기 ──
     if (currentMode === 'CHAT') {
+        // CHAT은 conflicts 없이 1차 mw 계산 후 handleChatMode 내부에서 재계산
+        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts: [] });
         await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft);
         return;
     }
 
     // ── RING 모드 (DeepL) ──
     try {
-        const target = isKorean ? 'VI' : 'KO';
-        const res    = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
-        const data   = await res.json();
+        const target         = isKorean ? 'VI' : 'KO';
+        const res            = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
+        const data           = await res.json();
         const rawTranslation = data.translations[0].text;
 
-        // KO→VI: 번역 결과(베트남어)에서 충돌 체크
-        // VI→KO: 입력 원문(베트남어)에서 충돌 체크
         const checkText       = isKorean ? rawTranslation : text;
         const detectedDialect = detectDialectScore(checkText);
         const finalDialect    = resolveDialect({ detectedDialect, userLocale });
         const conflicts       = detectConflicts(checkText, CONFLICT_DICTIONARY);
 
-        const sessionLog = { input: text, output: rawTranslation, timestamp: Date.now() };
+        // ── v3.6: conflicts 전달 ──
+        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts });
+
+        const sessionLog = { input: text, output: rawTranslation, rawScore, timestamp: Date.now() };
         sessionLogs.push(sessionLog);
 
         let topHtml = rawTranslation;
 
-        // 충돌 배지 (severity 기준)
+        // 충돌 배지
         if (conflicts.length > 0) {
             const hasHigh = conflicts.some(c => c.severity === 'high');
-            if (hasHigh) {
-                topHtml += ' <span class="conflict-badge">🔴 방언 주의</span>';
-            } else {
-                topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
-            }
+            topHtml += hasHigh
+                ? ' <span class="conflict-badge">🔴 방언 주의</span>'
+                : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
         }
 
-        // 감정 배지
+        // 갈등 레벨 배지
         if (mw.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
         } else if (mw.level === 'MEDIUM') {
             topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
         }
+
+        // ── v3.6 신규: 의도 배지 ──
+        topHtml += buildIntentBadge(mw.intent);
 
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
@@ -507,6 +516,7 @@ async function handleSend() {
 
         autoSaveToDataset({ inputText: text, outputText: rawTranslation, isKorean });
 
+        // ── v3.6: intent 전달 ──
         await saveTranslationLog({
             inputText:      text,
             outputText:     rawTranslation,
@@ -516,6 +526,8 @@ async function handleSend() {
             emotionScore:   mw.rrp,
             sessionId:      SESSION_ID,
             conflictCount:  conflicts.length,
+            intent:         mw.intent,
+            intentConf:     mw.confidence,
         });
 
         trackEvent('translate', {
@@ -525,6 +537,7 @@ async function handleSend() {
             emotionScore: rawScore,
             rrp:          mw.rrp,
             intentState:  mw.intentState,
+            intent:       mw.intent,
             mode:         'RING',
             timestamp:    Date.now(),
         });
@@ -569,7 +582,7 @@ function tokenizeVietnamese(text) {
 // ─── 단어 카드 모달 ───────────────────────────────────────────
 function showModal(original, translated, isKorean, cardText) {
     let chunkHtml = '';
-    const words = tokenizeVietnamese(cardText);
+    const words   = tokenizeVietnamese(cardText);
 
     const sentenceCard = `
         <div class="chunk-card sentence-unit">
@@ -589,8 +602,8 @@ function showModal(original, translated, isKorean, cardText) {
         if (!found) return;
         if (found.entry_type === 'auxiliary') return;
 
-        const standard = found.standard || found.standard_word || cleanWord;
-        const southern = found.southern || found.southern_word || cleanWord;
+        const standard      = found.standard || found.standard_word || cleanWord;
+        const southern      = found.southern || found.southern_word || cleanWord;
         const hasDialectDiff = standard.toLowerCase() !== southern.toLowerCase();
 
         let typeClass = '';
@@ -610,7 +623,6 @@ function showModal(original, translated, isKorean, cardText) {
         `;
     });
 
-    // ✅ 수정: cardText 기준으로 충돌 감지 통일
     detectConflicts(cardText, CONFLICT_DICTIONARY)
         .forEach(item => {
             const severityIcon = item.severity === 'high' ? '🔴' : '⚠️';
@@ -634,6 +646,19 @@ function showModal(original, translated, isKorean, cardText) {
 }
 
 // ─── 이벤트 핸들러 ────────────────────────────────────────────
+const clearBtn   = document.getElementById('clear-btn');
+const sendBtn    = document.getElementById('send-btn');
+const modalClose = document.getElementById('modal-close');
+const modeToggle = document.getElementById('mode-toggle');
+
+if (clearBtn)   clearBtn.onclick   = clearTodayChat;
+if (modeToggle) modeToggle.onclick = toggleMode;
+if (sendBtn)    sendBtn.onclick    = handleSend;
+if (modalClose) modalClose.onclick = () => modal.style.display = 'none';
+
+input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
 document.addEventListener('click', (e) => {
     const card = e.target.closest('.chunk-card');
     if (card) {
@@ -644,8 +669,3 @@ document.addEventListener('click', (e) => {
         });
     }
 });
-
-document.getElementById('send-btn').onclick    = handleSend;
-input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
-document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });

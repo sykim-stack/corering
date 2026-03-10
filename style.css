@@ -325,3 +325,13 @@ footer {
 .chunk-south { font-size: 11px; color: #aaa; display: block; }   /* #888 → #aaa */
 .dialect-diff { color: #f5a623 !important; }
 .dialect-card { border: 1px solid #f5a623; }
+
+.affection-badge {
+    background: rgba(100, 160, 255, 0.15);
+    color: #6ab0ff;
+    border: 1px solid rgba(100, 160, 255, 0.3);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+}

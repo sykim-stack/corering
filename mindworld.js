@@ -1,197 +1,130 @@
 // ============================================================
-// BRAINPOOL | MindWorld v1.0
-// 감정 상태 분석 / 역할 감지 / 관계 리스크 확률
-// DB 없음. 순수 로직 엔진. 세션 종료 시 전체 초기화.
+// BRAINPOOL | mindworld.js v1.1
+// 감정/역할/리스크/의도 분석 — 순수 로직 엔진 (DB 없음)
+// 변경: analyzeIntent() 추가, runMindWorld() conflicts 파라미터 추가 (v1.1)
 // ============================================================
 
-// ─── 세션 상태 (engine.js에서 참조) ───────────────────────────
-const sessionState = {
-    intentState: 'CALM',
-    recentEmotionScores: [],   // 최대 5개 슬라이딩 윈도우
-    conflictCount: 0,
-    conflictStateEntries: 0,
-    calmStreak: 0,
-    role: 'unknown'
-};
-
-// ─── 1. normalizeEmotion ──────────────────────────────────────
-// rawScore → 0~1 사이로 정규화 (clamp)
+// ─── 감정 점수 정규화 (0~1) ───────────────────────────────────
 function normalizeEmotion(rawScore) {
-    if (rawScore === null || rawScore === undefined || isNaN(rawScore)) return 0;
     return Math.min(1, Math.max(0, rawScore / 10));
 }
 
-// ─── 2. detectRole ────────────────────────────────────────────
-// 세션 로그 기반 남편/아내 판단
-// 최소 10개 로그 없으면 unknown 반환
+// ─── 역할 감지 (세션 로그 10개 이상 기준) ────────────────────
 function detectRole(sessionLogs) {
     if (!sessionLogs || sessionLogs.length < 10) return 'unknown';
-
-    const husbandWords = ['자기야', '당신', '여기', '이리와'];
-    const wifeWords   = ['오빠', '자기', 'anh', 'em', '여보세요'];
-
-    let husbandScore = 0;
-    let wifeScore    = 0;
-
-    sessionLogs.forEach(log => {
-        const text = (log.input || '').toLowerCase();
-        husbandWords.forEach(w => { if (text.includes(w)) husbandScore++; });
-        wifeWords.forEach(w   => { if (text.includes(w)) wifeScore++;    });
-    });
-
-    if (wifeScore > husbandScore)   return 'wife';
-    if (husbandScore > wifeScore)   return 'husband';
+    const koCount = sessionLogs.filter(l => /[ㄱ-ㅎ|가-힣]/.test(l.input || '')).length;
+    const viCount = sessionLogs.length - koCount;
+    if (koCount > viCount * 1.5) return 'husband';
+    if (viCount > koCount * 1.5) return 'wife';
     return 'unknown';
 }
 
-// ─── 3. detectConflict ────────────────────────────────────────
-// 충돌 단어 감지 (한/베 키워드 최소 정의)
-// conflict.js의 detectConflicts()와 역할이 다름:
-//   - conflict.js: DB 딕셔너리 전체 매칭 (UI 배지용)
-//   - 이 함수: MindWorld 내부 상태 전이용 boolean 반환
-const CONFLICT_KEYWORDS = ['싫어', '짜증', '됐어', '몰라', 'thôi', 'chán', 'ghét', 'kệ'];
-
-function detectConflict(text) {
-    if (!text) return false;
-    const lower = text.toLowerCase();
-    return CONFLICT_KEYWORDS.some(k => lower.includes(k));
+// ─── 충돌 키워드 감지 (상태 전이용) ──────────────────────────
+function detectConflict(inputText) {
+    const conflictKeywords = ['왜', '싫어', '됐어', '하지마', '그만', 'thôi', 'đừng', 'ghét', 'không muốn'];
+    return conflictKeywords.some(k => (inputText || '').includes(k));
 }
 
-// ─── 4. nextIntentState ───────────────────────────────────────
-// 5상태 전이 머신: CALM → TENSE → CONFLICT → RECOVERY → STABLE
-function nextIntentState({ currentState, emotionScore, conflictDetected, shortSentence }) {
-    const isHigh    = emotionScore > 0.6;
-    const isLow     = emotionScore < 0.3;
-    const hasConf   = conflictDetected;
+// ─── 5상태 전이 머신 ──────────────────────────────────────────
+// CALM → TENSE → CONFLICT → RECOVERY → STABLE
+function nextIntentState({ currentState, hasConflict, normalized }) {
+    const state = currentState || 'CALM';
 
-    switch (currentState) {
-        case 'CALM':
-            if (hasConf || isHigh) return 'TENSE';
-            return 'CALM';
-
-        case 'TENSE':
-            if (hasConf && isHigh) return 'CONFLICT';
-            if (isLow && !hasConf) return 'CALM';
-            return 'TENSE';
-
-        case 'CONFLICT':
-            if (isLow && !hasConf) return 'RECOVERY';
-            return 'CONFLICT';
-
-        case 'RECOVERY':
-            // RECOVERY는 calmStreak 카운트만 유지, 전이는 evaluateRisk에서 결정
-            if (hasConf || isHigh) return 'CONFLICT';
-            return 'RECOVERY';
-
-        case 'STABLE':
-            if (hasConf || isHigh) return 'TENSE';
-            return 'STABLE';
-
-        default:
-            return 'CALM';
-    }
-}
-
-// ─── 5. calculateCAS ─────────────────────────────────────────
-// 갈등 누적 점수 (최근 5개 슬라이딩 윈도우)
-function calculateCAS(state) {
-    const recent = state.recentEmotionScores.slice(-5);
-    const avgEmotion = recent.length
-        ? recent.reduce((a, b) => a + b, 0) / recent.length
-        : 0;
-
-    const cas = (state.conflictStateEntries * 2) + (avgEmotion * 3) + state.conflictCount;
-    return Math.round(Math.min(cas, 10) * 10) / 10;
-}
-
-// ─── 6. calculateRRP ─────────────────────────────────────────
-// 관계 리스크 확률 (바이어스 -2.0 고정 → 일상 대화 0.25~0.4 수준)
-function calculateRRP({ emotionScore, cas, role }) {
-    const roleWeight = role === 'wife' ? 0.6 : role === 'husband' ? 0.2 : 0.4;
-    const z = (emotionScore * 4) + (cas * 0.5) + roleWeight - 2.0;  // ✅ 바이어스 -2.0
-    const rrp = 1 / (1 + Math.exp(-z));
-    return Math.round(rrp * 100) / 100;
-}
-
-// ─── 7. evaluateRisk ─────────────────────────────────────────
-// Decision Layer → level / gemini 전환 여부 / softTone 여부
-function evaluateRisk(rrp) {
-    if (rrp > 0.75) {
-        return { level: 'HIGH',   gemini: true,  softTone: true  };
-    } else if (rrp > 0.5) {
-        return { level: 'MEDIUM', gemini: false, softTone: true  };
+    if (hasConflict) {
+        if (state === 'CALM')     return 'TENSE';
+        if (state === 'TENSE')    return 'CONFLICT';
+        if (state === 'CONFLICT') return 'CONFLICT';
+        if (state === 'RECOVERY') return 'TENSE';
+        if (state === 'STABLE')   return 'TENSE';
     } else {
-        return { level: 'LOW',    gemini: false, softTone: false };
+        if (normalized < 0.3) {
+            if (state === 'CONFLICT') return 'RECOVERY';
+            if (state === 'TENSE')    return 'CALM';
+            if (state === 'RECOVERY') return 'STABLE';
+        }
     }
+    return state;
 }
 
-// ─── 8. updateSession ────────────────────────────────────────
-// 매 턴 세션 상태 갱신 (engine.js에서 호출)
-function updateSession({ emotionScore, newIntentState, conflictDetected }) {
-    // 슬라이딩 윈도우 (최대 5개)
-    sessionState.recentEmotionScores.push(emotionScore);
-    if (sessionState.recentEmotionScores.length > 5) {
-        sessionState.recentEmotionScores.shift();
-    }
+// ─── 갈등 누적 점수 (최근 5개 슬라이딩 윈도우) ───────────────
+function calculateCAS(scoreHistory) {
+    if (!scoreHistory || scoreHistory.length === 0) return 0;
+    const recent = scoreHistory.slice(-5);
+    const sum    = recent.reduce((a, b) => a + (b || 0), 0);
+    return sum / recent.length;
+}
 
-    // CONFLICT 상태 진입 횟수
-    if (newIntentState === 'CONFLICT') {
-        sessionState.conflictStateEntries++;
-    }
+// ─── 관계 리스크 확률 (바이어스 -2.0 적용) ───────────────────
+function calculateRRP({ cas, normalized }) {
+    const raw = (cas * 0.6) + (normalized * 10 * 0.4) - 2.0;
+    return Math.min(1, Math.max(0, raw / 10));
+}
 
-    // 충돌 감지 카운트
-    if (conflictDetected) {
-        sessionState.conflictCount++;
-        sessionState.calmStreak = 0;
-    } else {
-        // RECOVERY 상태일 때는 calmStreak 증가만, 리셋 없음
-        if (newIntentState !== 'RECOVERY') {
-            sessionState.calmStreak++;
+// ─── Decision Layer (Gemini 분기 여부 결정) ───────────────────
+function evaluateRisk({ rrp, intentState }) {
+    if (rrp >= 0.7 || intentState === 'CONFLICT') {
+        return { level: 'HIGH',   useGemini: true  };
+    }
+    if (rrp >= 0.4 || intentState === 'TENSE') {
+        return { level: 'MEDIUM', useGemini: false };
+    }
+    return     { level: 'LOW',    useGemini: false };
+}
+
+// ─── 의도 분류 (순수 로직) ────────────────────────────────────
+// intent: REQUEST | COMPLAINT | THREAT | AFFECTION | NEUTRAL
+function analyzeIntent({ inputText, conflicts = [], rawScore = 0, intentState = 'CALM' }) {
+    const text = inputText || '';
+
+    const intentMap = {
+        THREAT:    ['하지마', '그만해', '됐어', '꺼져', 'thôi', 'đừng', 'ghét'],
+        COMPLAINT: ['왜', '짜증', '싫어', '몰라', 'sao lại', 'không thích', 'bực'],
+        REQUEST:   ['해줘', '부탁', '원해', '있어?', 'giúp', 'được không', 'muốn'],
+        AFFECTION: ['사랑해', '고마워', '미안해', '보고싶어', 'yêu', 'cảm ơn', 'nhớ'],
+    };
+
+    // 1차: 키워드 매칭
+    let detected = 'NEUTRAL';
+    let maxHits  = 0;
+
+    for (const [intent, keywords] of Object.entries(intentMap)) {
+        const hits = keywords.filter(k => text.includes(k)).length;
+        if (hits > maxHits) {
+            maxHits  = hits;
+            detected = intent;
         }
     }
 
-    sessionState.intentState = newIntentState;
-}
-
-// ─── 9. runMindWorld ─────────────────────────────────────────
-// 통합 실행 함수 (engine.js에서 단일 호출)
-// 반환: { level, gemini, softTone, rrp, cas, intentState }
-function runMindWorld({ rawScore, inputText, sessionLogs }) {
-    // ① 감정 정규화
-    const emotionScore = normalizeEmotion(rawScore);
-
-    // ② 충돌 감지
-    const conflictDetected = detectConflict(inputText);
-
-    // ③ 역할 감지 (10턴마다 갱신, 첫 턴은 unknown)
-    if (!sessionLogs || sessionLogs.length % 10 === 0) {
-        sessionState.role = detectRole(sessionLogs);
+    // 2차: 충돌 단어 가중 보정
+    if (conflicts.length > 0) {
+        if (detected === 'NEUTRAL')   detected = 'COMPLAINT';
+        else if (detected === 'COMPLAINT') detected = 'THREAT';
     }
 
-    // ④ 상태 전이
-    const shortSentence = inputText && inputText.length < 5;
-    const newIntentState = nextIntentState({
-        currentState: sessionState.intentState,
-        emotionScore,
-        conflictDetected,
-        shortSentence
-    });
+    // 3차: 상태머신 보정 (CONFLICT 상태면 NEUTRAL → COMPLAINT 강제)
+    if (intentState === 'CONFLICT' && detected === 'NEUTRAL') {
+        detected = 'COMPLAINT';
+    }
 
-    // ⑤ 세션 업데이트
-    updateSession({ emotionScore, newIntentState, conflictDetected });
-
-    // ⑥ CAS / RRP 계산
-    const cas = calculateCAS(sessionState);
-    const rrp = calculateRRP({ emotionScore, cas, role: sessionState.role });
-
-    // ⑦ 리스크 판단
-    const risk = evaluateRisk(rrp);
+    // 4차: 감정 점수 보정 (rawScore 6 이상이면 COMPLAINT로 격상)
+    if (rawScore >= 6 && detected === 'NEUTRAL') {
+        detected = 'COMPLAINT';
+    }
 
     return {
-        ...risk,
-        rrp,
-        cas,
-        intentState: newIntentState,
-        role: sessionState.role
+        intent:     detected,
+        confidence: maxHits > 0 ? 'keyword' : 'inferred',
     };
 }
+
+// ─── 통합 실행 함수 ───────────────────────────────────────────
+function runMindWorld({ rawScore, inputText, sessionLogs = [], conflicts = [] }) {
+
+    const normalized  = normalizeEmotion(rawScore);
+    const role        = detectRole(sessionLogs);
+    const hasConflict = detectConflict(inputText);
+
+    const prevState   = sessionLogs.length > 1
+        ? (sessionLogs[sessionLogs.length - 2].intentState || 'CALM')
+        : 'CALM';
+    const intentState = nextIntentState({ currentState: prevState, hasConflict, normalized });
