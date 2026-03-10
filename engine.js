@@ -1,7 +1,11 @@
 // ============================================================
-// BRAINPOOL | CoreRing Engine v3.4 → CoreChat 업그레이드
+// BRAINPOOL | CoreRing Engine v3.5
 // RING 모드: DeepL 번역 + 단어 카드
 // CHAT 모드: Gemini 멀티턴 + 국제결혼 특화
+//
+// v3.5 수정사항:
+//   - showModal(): cardText 기준으로 충돌 감지 통일
+//   - handleChatMode(): 충돌 감지 + 배지 표시 추가
 // ============================================================
 
 let CORE_DICTIONARY     = [];
@@ -250,7 +254,6 @@ function toggleMode() {
         ? '심장을 분석합니다...'
         : '대화를 입력하세요...';
 
-    // 웰컴카드 모드 표시 갱신
     const preset = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
     const wc = document.getElementById('welcome-card');
     if (wc) renderWelcomeCard(preset.vi, preset.ko);
@@ -331,7 +334,25 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
 
         const translated = data.translated;
 
+        // ✅ 수정: CHAT 모드도 충돌 감지 추가
+        // KO→VI: 번역 결과(베트남어)에서 충돌 체크
+        // VI→KO: 입력 원문(베트남어)에서 충돌 체크
+        const checkText = isKorean ? translated : text;
+        const conflicts = detectConflicts(checkText, CONFLICT_DICTIONARY);
+
         let topHtml = translated;
+
+        // 충돌 배지 (severity 기준)
+        if (conflicts.length > 0) {
+            const hasHigh = conflicts.some(c => c.severity === 'high');
+            if (hasHigh) {
+                topHtml += ' <span class="conflict-badge">🔴 방언 주의</span>';
+            } else {
+                topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+            }
+        }
+
+        // 감정 배지
         if (mw.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
         } else if (mw.level === 'MEDIUM') {
@@ -351,7 +372,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
             topHtml,
             isKorean,
             isLeft,
-            checkText:  translated,
+            checkText,
             firstLang,
             mode:       'CHAT',
             timestamp:  Date.now(),
@@ -364,18 +385,18 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                source_locale:    isKorean ? 'ko' : 'vi',
-                target_locale:    isKorean ? 'vi' : 'ko',
-                input_text:       text,
-                output_text:      translated,
-                engine_used:      'gemini',
-                emotion_score:    mw?.rrp ?? null,
-                conflict_detected: mw?.level === 'HIGH',
+                source_locale:     isKorean ? 'ko' : 'vi',
+                target_locale:     isKorean ? 'vi' : 'ko',
+                input_text:        text,
+                output_text:       translated,
+                engine_used:       'gemini',
+                emotion_score:     mw?.rrp ?? null,
+                conflict_detected: conflicts.length > 0,
             }),
         }).catch(() => {});
 
         pairDiv.onclick = () => {
-            showModal(text, translated, isKorean, isKorean ? translated : text);
+            showModal(text, translated, isKorean, checkText);
         };
 
     } catch (e) {
@@ -383,6 +404,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
         console.error('[CoreChat]', e);
     }
 }
+
 // ─── 메인 번역 처리 ───────────────────────────────────────────
 async function handleSend() {
     const text = input.value.trim();
@@ -420,13 +442,15 @@ async function handleSend() {
         return;
     }
 
-    // ── RING 모드 (기존 DeepL) ──
+    // ── RING 모드 (DeepL) ──
     try {
         const target = isKorean ? 'VI' : 'KO';
         const res    = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
         const data   = await res.json();
         const rawTranslation = data.translations[0].text;
 
+        // KO→VI: 번역 결과(베트남어)에서 충돌 체크
+        // VI→KO: 입력 원문(베트남어)에서 충돌 체크
         const checkText       = isKorean ? rawTranslation : text;
         const detectedDialect = detectDialectScore(checkText);
         const finalDialect    = resolveDialect({ detectedDialect, userLocale });
@@ -436,14 +460,24 @@ async function handleSend() {
         sessionLogs.push(sessionLog);
 
         let topHtml = rawTranslation;
+
+        // 충돌 배지 (severity 기준)
         if (conflicts.length > 0) {
-            topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+            const hasHigh = conflicts.some(c => c.severity === 'high');
+            if (hasHigh) {
+                topHtml += ' <span class="conflict-badge">🔴 방언 주의</span>';
+            } else {
+                topHtml += ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+            }
         }
+
+        // 감정 배지
         if (mw.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
         } else if (mw.level === 'MEDIUM') {
             topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
         }
+
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
         try {
@@ -576,13 +610,16 @@ function showModal(original, translated, isKorean, cardText) {
         `;
     });
 
-    detectConflicts(isKorean ? translated : original, CONFLICT_DICTIONARY)
+    // ✅ 수정: cardText 기준으로 충돌 감지 통일
+    detectConflicts(cardText, CONFLICT_DICTIONARY)
         .forEach(item => {
+            const severityIcon = item.severity === 'high' ? '🔴' : '⚠️';
             chunkHtml += `
                 <div class="chunk-card conflict-card">
-                    <span class="chunk-v">⚠️ ${item.word}</span>
+                    <span class="chunk-v">${severityIcon} ${item.word}</span>
                     <span class="chunk-north">북부: ${item.meaning_northern}</span>
                     <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
+                    ${item.note ? `<span class="chunk-k">${item.note}</span>` : ''}
                 </div>`;
         });
 
