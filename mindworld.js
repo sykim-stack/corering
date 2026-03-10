@@ -83,7 +83,6 @@ function analyzeIntent({ inputText, conflicts = [], rawScore = 0, intentState = 
         AFFECTION: ['사랑해', '고마워', '미안해', '보고싶어', 'yêu', 'cảm ơn', 'nhớ'],
     };
 
-    // 1차: 키워드 매칭
     let detected = 'NEUTRAL';
     let maxHits  = 0;
 
@@ -95,18 +94,15 @@ function analyzeIntent({ inputText, conflicts = [], rawScore = 0, intentState = 
         }
     }
 
-    // 2차: 충돌 단어 가중 보정
     if (conflicts.length > 0) {
-        if (detected === 'NEUTRAL')   detected = 'COMPLAINT';
+        if (detected === 'NEUTRAL')        detected = 'COMPLAINT';
         else if (detected === 'COMPLAINT') detected = 'THREAT';
     }
 
-    // 3차: 상태머신 보정 (CONFLICT 상태면 NEUTRAL → COMPLAINT 강제)
     if (intentState === 'CONFLICT' && detected === 'NEUTRAL') {
         detected = 'COMPLAINT';
     }
 
-    // 4차: 감정 점수 보정 (rawScore 6 이상이면 COMPLAINT로 격상)
     if (rawScore >= 6 && detected === 'NEUTRAL') {
         detected = 'COMPLAINT';
     }
@@ -128,3 +124,25 @@ function runMindWorld({ rawScore, inputText, sessionLogs = [], conflicts = [] })
         ? (sessionLogs[sessionLogs.length - 2].intentState || 'CALM')
         : 'CALM';
     const intentState = nextIntentState({ currentState: prevState, hasConflict, normalized });
+
+    const cas  = calculateCAS(sessionLogs.map(l => l.rawScore || 0));
+    const rrp  = calculateRRP({ cas, normalized });
+    const risk = evaluateRisk({ rrp, intentState });
+
+    const intentResult = analyzeIntent({
+        inputText,
+        conflicts,
+        rawScore,
+        intentState,
+    });
+
+    return {
+        level:      risk.level,
+        intentState,
+        role,
+        rrp,
+        cas,
+        intent:     intentResult.intent,
+        confidence: intentResult.confidence,
+    };
+}
