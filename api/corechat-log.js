@@ -1,3 +1,9 @@
+// ============================================================
+// BRAINPOOL | CoreRing /api/corechat-log.js
+// CHAT 모드 번역 로그 저장
+// v1.1: corechat 스키마 제거 → public.translation_logs 사용
+// ============================================================
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -30,18 +36,17 @@ export default async function handler(req, res) {
                     'apikey': SUPABASE_KEY,
                     'Authorization': `Bearer ${SUPABASE_KEY}`,
                     'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal',
-                    'Accept-Profile': 'corechat',
-                    'Content-Profile': 'corechat'
+                    'Prefer': 'return=minimal'
+                    // ✅ 수정: Accept-Profile, Content-Profile 제거 (public 스키마 기본 사용)
                 },
                 body: JSON.stringify({
-                    user_id: user_id || null,
-                    source_locale: source_locale || null,
-                    target_locale: target_locale || null,
+                    user_id:           user_id || null,
+                    source_locale:     source_locale || null,
+                    target_locale:     target_locale || null,
                     input_text,
                     output_text,
                     engine_used,
-                    emotion_score: emotion_score ?? null,
+                    emotion_score:     emotion_score ?? null,
                     conflict_detected: conflict_detected ?? false
                 })
             }
