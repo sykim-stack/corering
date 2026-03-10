@@ -1,7 +1,6 @@
 // ============================================================
-// BRAINPOOL | CoreRing api/southern-fill.js v1.0
-// pending 단어들의 southern_word를 Gemini로 자동 채움
-// 10개씩 배치 처리 → southern_word 업데이트 → status = 'approved'
+// BRAINPOOL | CoreRing api/southern-fill.js v1.1
+// v1.1: supabase.raw 제거 → JS 필터 방식으로 변경
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -56,7 +55,6 @@ ${wordList}
     const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (!raw) throw new Error('Gemini 응답 없음');
 
-    // JSON 파싱 (```json 펜스 제거)
     const clean = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
 }
@@ -67,13 +65,12 @@ export default async function handler(req, res) {
     }
 
     try {
-        // ① pending 데이터 조회 (southern_word = standard_word 인 것만)
+        // ① pending 데이터 조회 → JS에서 southern_word = standard_word 필터
         const { data: rows, error: fetchErr } = await supabase
             .from('tp_translations')
-            .select('id, standard_word')
+            .select('id, standard_word, southern_word')
             .eq('status', 'pending')
             .eq('source', 'auto')
-            .filter('southern_word', 'eq', supabase.raw('standard_word'))
             .limit(50);
 
         if (fetchErr) throw new Error(fetchErr.message);
@@ -81,12 +78,19 @@ export default async function handler(req, res) {
             return res.status(200).json({ message: '처리할 데이터 없음', updated: 0 });
         }
 
+        // southern_word = standard_word 인 것만 필터 (JS에서)
+        const targets = rows.filter(r => r.southern_word === r.standard_word);
+
+        if (targets.length === 0) {
+            return res.status(200).json({ message: '처리할 데이터 없음', updated: 0 });
+        }
+
         let totalUpdated = 0;
         const errors     = [];
 
         // ② 10개씩 배치 처리
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-            const batch = rows.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+            const batch = targets.slice(i, i + BATCH_SIZE);
             const words = batch.map(r => r.standard_word);
 
             try {
@@ -113,22 +117,21 @@ export default async function handler(req, res) {
 
                 console.log(`[southern-fill] 배치 ${i / BATCH_SIZE + 1} 완료: ${batch.length}개`);
 
-                // Gemini rate limit 방지 (배치 간 0.5초 대기)
-                if (i + BATCH_SIZE < rows.length) {
+                if (i + BATCH_SIZE < targets.length) {
                     await new Promise(r => setTimeout(r, 500));
                 }
 
             } catch (batchErr) {
-                console.error(`[southern-fill] 배치 ${i / BATCH_SIZE + 1} 오류:`, batchErr.message);
+                console.error(`[southern-fill] 배치 오류:`, batchErr.message);
                 errors.push({ batch: i / BATCH_SIZE + 1, error: batchErr.message });
             }
         }
 
         return res.status(200).json({
-            message:      '완료',
-            total:        rows.length,
-            updated:      totalUpdated,
-            errors:       errors.length > 0 ? errors : undefined,
+            message: '완료',
+            total:   targets.length,
+            updated: totalUpdated,
+            errors:  errors.length > 0 ? errors : undefined,
         });
 
     } catch (e) {
