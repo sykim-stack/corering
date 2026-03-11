@@ -4,12 +4,10 @@
 // standard_word (베트남어), meaning_ko (한국어)
 // ============================================================
 
-const PIPELINE_ENDPOINT = '/api/pipeline';
+const PIPELINE_ENDPOINT = '/api/corering?action=pipeline';
 
 async function autoSaveToDataset({ inputText, outputText, isKorean }) {
     try {
-        // KO→VI: input=한국어, output=베트남어
-        // VI→KO: input=베트남어, output=한국어
         const standard_word = isKorean ? outputText : inputText;
         const meaning_ko    = isKorean ? inputText  : outputText;
 
@@ -17,7 +15,6 @@ async function autoSaveToDataset({ inputText, outputText, isKorean }) {
         if (standard_word.trim().length < 1 || standard_word.trim().length > 200) return;
         if (meaning_ko.trim().length < 1    || meaning_ko.trim().length > 200)    return;
 
-        // 문장인지 단어인지 판단 (공백 2개 이상이면 phrase)
         const entry_type = standard_word.trim().split(/\s+/).length > 2 ? 'phrase' : 'word';
 
         const res = await fetch(PIPELINE_ENDPOINT, {

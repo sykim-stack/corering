@@ -11,7 +11,7 @@ async function saveTranslationLog({
     intent, intentConf
 }) {
     try {
-        await fetch('/api/corelink', {
+        await fetch('/api/corering?action=corelink', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
