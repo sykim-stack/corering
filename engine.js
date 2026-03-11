@@ -148,6 +148,24 @@ async function initEngine() {
         CONFLICT_DICTIONARY = [];
     }
 }
+    // ─── send message ──────────────────────────────────────────────
+async function sendMessage(text){
+
+    if(!currentRoom){
+        alert("ROOM 먼저 선택")
+        return
+    }
+
+    await fetch("/api/send_message",{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            room_id:currentRoom,
+            message:text
+        })
+    })
+
+}
 
 // ─── 웰컴 화면 ───────────────────────────────────────────────
 const WELCOME_PHRASES = [

@@ -32,19 +32,18 @@
             <div style="display:flex; align-items:center; gap:14px;">
 
                 <!-- 모드 토글 -->
-                <button id="mode-toggle" onclick="toggleMode()" style="
-                    background: none;
-                    border: 1px solid rgba(255,255,255,0.12);
-                    cursor: pointer;
-                    color: currentColor;
-                    padding: 4px 14px;
-                    border-radius: 20px;
-                    font-size: 10px;
-                    letter-spacing: 2px;
-                    font-family: monospace;
-                    transition: all 0.3s;
+                <button id="room-toggle" style="
+                background:none;
+                border:1px solid rgba(255,255,255,0.12);
+                cursor:pointer;
+                color:currentColor;
+                padding:4px 14px;
+                border-radius:20px;
+                font-size:10px;
+                letter-spacing:2px;
+                font-family:monospace;
                 ">
-                    <span id="mode-label">RING</span>
+                ROOM
                 </button>
             
                 <!-- 대화 삭제 버튼 (다시 추가) -->
@@ -89,7 +88,20 @@
     </header>
 
     <main id="chat-history"></main>
-
+    <!-- Chat Room Layer -->
+    <div id="room-layer" style="
+    position:fixed;
+    top:60px;
+    left:0;
+    right:0;
+    bottom:70px;
+    background:#0a0a0a;
+    display:none;
+    overflow-y:auto;
+    z-index:50;
+    ">
+    <div id="room-list" style="padding:20px;"></div>
+</div>    
     <div id="modal-overlay" class="modal-overlay">
         <div class="modal-content">
             <div id="modal-body"></div>
@@ -114,5 +126,6 @@
     <script src="share.js"></script>
     <script src="install.js"></script>
     <script src="locale-setup.js"></script>
+    <script src="rooms.js"></script>
 </body>
 </html>
