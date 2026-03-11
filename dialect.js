@@ -19,7 +19,7 @@ const dialectRules = [
 ];
 
 function detectDialectScore(text) {
-    if (!text) return 'neutral';
+    if (!text) return 'unknown';
     let score = { north: 0, south: 0 };
     const lowerText = text.toLowerCase();
     dialectRules.forEach(r => {
@@ -33,5 +33,5 @@ function detectDialectScore(text) {
 function resolveDialect({ detectedDialect, userLocale }) {
     if (userLocale === 'vi_north') return 'north';
     if (userLocale === 'vi_south') return 'south';
-    return detectedDialect || 'neutral';
+    return detectedDialect || 'unknown';
 }

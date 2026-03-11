@@ -1,59 +1,46 @@
 // ============================================================
-// BRAINPOOL | CoreRing pipeline.js v2.1
-// 자동 데이터셋 파이프라인 - 저장 조건 강화
-// v2.1: 긴 문장 차단 (단어 3개 이하만), 한국어 혼입 차단
+// BRAINPOOL | CoreRing api/pipeline.js v1.0
+// 자동 데이터셋 파이프라인 - RPC 트랜잭션 처리
 // ============================================================
 
-const PIPELINE_ENDPOINT = '/api/pipeline';
+import { createClient } from '@supabase/supabase-js';
 
-async function autoSaveToDataset({ inputText, outputText, isKorean }) {
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const { standard_word, meaning_ko, entry_type } = req.body;
+
+    // 입력값 검증
+    if (!standard_word || !meaning_ko) {
+        return res.status(400).json({ error: '필수값 누락' });
+    }
+    if (standard_word.trim().length < 1 || standard_word.trim().length > 100) {
+        return res.status(400).json({ error: 'standard_word 길이 오류' });
+    }
+    if (meaning_ko.trim().length < 1 || meaning_ko.trim().length > 100) {
+        return res.status(400).json({ error: 'meaning_ko 길이 오류' });
+    }
+
     try {
-        // KO→VI: input=한국어, output=베트남어
-        // VI→KO: input=베트남어, output=한국어
-        const standard_word = isKorean ? outputText : inputText;
-        const meaning_ko    = isKorean ? inputText  : outputText;
-
-        if (!standard_word || !meaning_ko) return;
-
-        const sw = standard_word.trim();
-        const mk = meaning_ko.trim();
-
-        // ── 저장 조건 필터 ────────────────────────────────────
-
-        // 1. 길이 기본 체크
-        if (sw.length < 1 || sw.length > 100) return;
-        if (mk.length < 1 || mk.length > 100) return;
-
-        // 2. 단어 3개 이하만 저장 (긴 문장 차단)
-        const wordCount = sw.split(/\s+/).length;
-        if (wordCount > 3) return;
-
-        // 3. standard_word에 한국어 혼입 차단
-        if (/[ㄱ-ㅎ가-힣]/.test(sw)) return;
-
-        // 4. meaning_ko에 베트남어 성조 문자 혼입 차단
-        if (/[àáâãèéêìíòóôõùúýăđơưạảấầẩẫậắặẳẵẽẻếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/.test(mk)) return;
-
-        // 5. 특수문자만 있는 경우 차단
-        if (!/[a-zA-Z]/.test(sw)) return;
-
-        // entry_type 판단
-        const entry_type = wordCount > 1 ? 'phrase' : 'word';
-
-        const res = await fetch(PIPELINE_ENDPOINT, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ standard_word: sw, meaning_ko: mk, entry_type })
+        const { data, error } = await supabase.rpc('approve_translation', {
+            p_standard_word: standard_word.trim(),
+            p_meaning_ko:    meaning_ko.trim(),
+            p_entry_type:    entry_type || 'word'
         });
 
-        const data = await res.json();
+        if (error) throw new Error(error.message);
 
-        if (data.saved) {
-            console.debug('[pipeline] 신규 저장:', data.id, sw, '→', mk);
-        } else {
-            console.debug('[pipeline] 중복 스킵:', sw);
-        }
+        return res.status(200).json(data);
+
     } catch (e) {
-        console.debug('[pipeline] 저장 실패 (무시):', e.message);
+        console.error('[pipeline] 오류:', e.message);
+        return res.status(500).json({ error: e.message });
     }
 }
