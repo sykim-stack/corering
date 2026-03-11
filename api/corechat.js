@@ -1,282 +1,308 @@
 // ============================================================
-// BRAINPOOL | CoreChat — 통합 API v1.0
-// 라우팅: /api/corechat?action=xxx
-//
-// action 목록:
-//   chat             ← chat.js
-//   log              ← corechat-log.js
-//   create-room      ← create_room.js
-//   get-messages     ← get_messages.js
-//   send-message     ← send_message.js
-//   join-room        ← join-room.js
-//   create-space     ← create_space.js
+// BRAINPOOL | CoreRing rooms.js v2.0
+// 번역기 사용 중 채팅방으로 전환하는 레이어
+// - ROOM 버튼 → 방 목록
+// - 방 선택 → room-layer 안에서 채팅
+// - 번역 UI는 아래에 그대로 유지
 // ============================================================
 
-import { createClient } from '@supabase/supabase-js';
+const roomLayer  = document.getElementById("room-layer")
+const roomList   = document.getElementById("room-list")
+const roomToggle = document.getElementById("room-toggle")
 
-const supabaseService = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+let rooms       = []
+let currentRoom = null
+let chatPolling = null
 
-const supabaseAnon = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
+roomToggle.addEventListener("click", toggleRooms)
 
-// ─────────────────────────────────────────────
-// CHAT (Gemini 번역)
-// ─────────────────────────────────────────────
-async function handleChat(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const { text, history = [], softTone = false, role = 'unknown', dialect = 'vi_south' } = req.body;
-    if (!text) return res.status(400).json({ error: 'text is required' });
-
-    const dialectGuide =
-        dialect === 'vi_north' ? '베트남 북부(하노이) 구어체 기준으로 번역.' :
-        dialect === 'vi_south' ? '베트남 남부(호치민) 구어체 기준으로 번역.' :
-        '표준 베트남어 기준으로 번역.';
-
-    const SYSTEM_PROMPT = `
-당신은 한국-베트남 부부 통역사입니다.
-${dialectGuide}
-
-규칙:
-1. 번역 결과만 출력. 설명 절대 금지.
-2. 괄호, 태그, 안내문구 절대 금지.
-3. 자연스럽고 따뜻한 톤 유지.
-4. 한 줄로만 출력.
-`.trim();
-
-    const isKorean   = /[ㄱ-ㅎ|가-힣]/.test(text);
-    const direction  = isKorean ? 'KO→VI' : 'VI→KO';
-    const targetLang = isKorean ? '베트남어' : '한국어';
-
-    const toneGuide = softTone
-        ? '\n⚠️ 현재 감정 긴장 상태. 모든 표현을 최대한 부드럽고 따뜻하게 번역할 것.'
-        : '';
-
-    const contextText = history.slice(-5).map((log, i) =>
-        `[대화 ${i + 1}] 원문: "${log.input}" → 번역: "${log.output}"`
-    ).join('\n');
-
-    const contextGuide = contextText
-        ? `\n[이전 대화 맥락]\n${contextText}\n위 맥락을 참고해서 번역하세요.`
-        : '';
-
-    const fullPrompt = `${SYSTEM_PROMPT}${toneGuide}${contextGuide}
-
-다음 문장을 ${targetLang}로 번역하세요:
-"${text}"`;
-
-    try {
-        const geminiRes = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': process.env.GEMINI_API_KEY,
-                },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: fullPrompt }] }],
-                    generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
-                }),
-            }
-        );
-
-        if (!geminiRes.ok) {
-            const err = await geminiRes.json();
-            throw new Error(err.error?.message || 'Gemini API 오류');
+// ─── 토글 ────────────────────────────────────────────────────
+function toggleRooms() {
+    if (roomLayer.style.display === "none") {
+        if (currentRoom) {
+            showChatView(currentRoom)
+        } else {
+            loadRooms()
+            showListView()
         }
-
-        const geminiData = await geminiRes.json();
-        const translated = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!translated) throw new Error('번역 결과 없음');
-
-        return res.status(200).json({ translated, direction, softTone });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
+        roomLayer.style.display = "block"
+    } else {
+        roomLayer.style.display = "none"
+        stopPolling()
     }
 }
 
-// ─────────────────────────────────────────────
-// LOG
-// ─────────────────────────────────────────────
-async function handleLog(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+// ─── 방 목록 뷰 ──────────────────────────────────────────────
+function showListView() {
+    roomList.innerHTML = `
+        <div style="
+            display:flex; justify-content:space-between;
+            align-items:center; margin-bottom:20px;
+        ">
+            <span style="font-size:11px; letter-spacing:3px; color:#555;">CHAT ROOMS</span>
+            <button onclick="createNewRoom()" style="
+                background:none; border:1px solid rgba(255,255,255,0.15);
+                color:#aaa; padding:6px 14px; border-radius:20px;
+                font-size:10px; letter-spacing:2px; cursor:pointer;
+                font-family:monospace;
+            ">+ NEW ROOM</button>
+        </div>
+        <div id="room-items"></div>
+    `
+}
 
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+async function loadRooms() {
+    showListView()
+    try {
+        const res = await fetch("/api/corechat?action=get-rooms")
+        rooms = await res.json()
+        renderRoomList()
+    } catch(e) {
+        document.getElementById("room-items").innerHTML =
+            `<div style="color:#555; font-size:12px; padding:20px 0;">방 목록을 불러올 수 없습니다.</div>`
+    }
+}
+
+function renderRoomList() {
+    const container = document.getElementById("room-items")
+    if (!container) return
+
+    if (!rooms || rooms.length === 0) {
+        container.innerHTML = `
+            <div style="
+                text-align:center; padding:40px 0;
+                color:#444; font-size:12px; line-height:2;
+            ">
+                아직 채팅방이 없어요.<br>
+                <span style="color:#666;">NEW ROOM으로 시작해보세요.</span>
+            </div>
+        `
+        return
+    }
+
+    container.innerHTML = ""
+    rooms.forEach(room => {
+        const div = document.createElement("div")
+        div.style.cssText = `
+            padding:16px 12px;
+            border-bottom:1px solid #1a1a1a;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:12px;
+            transition:background 0.15s;
+        `
+        div.onmouseenter = () => div.style.background = "#111"
+        div.onmouseleave = () => div.style.background = "none"
+
+        const created = new Date(room.created_at).toLocaleDateString('ko-KR', {
+            month:'short', day:'numeric'
+        })
+
+        div.innerHTML = `
+            <div style="
+                width:36px; height:36px; border-radius:50%;
+                background:#1a1a1a; border:1px solid #2a2a2a;
+                display:flex; align-items:center; justify-content:center;
+                font-size:14px; flex-shrink:0;
+            ">💬</div>
+            <div>
+                <div style="font-size:13px; color:#ddd; font-family:monospace;">
+                    ${room.id.slice(0,8).toUpperCase()}
+                </div>
+                <div style="font-size:11px; color:#444; margin-top:2px;">${created}</div>
+            </div>
+        `
+        div.onclick = () => enterRoom(room.id)
+        container.appendChild(div)
+    })
+}
+
+// ─── 방 입장 ─────────────────────────────────────────────────
+function enterRoom(roomId) {
+    currentRoom = roomId
+    showChatView(roomId)
+    loadMessages(roomId)
+    startPolling(roomId)
+}
+
+// ─── 채팅 뷰 렌더 ────────────────────────────────────────────
+function showChatView(roomId) {
+    roomList.innerHTML = `
+        <div style="
+            display:flex; align-items:center; gap:12px;
+            padding-bottom:16px; border-bottom:1px solid #1a1a1a;
+            margin-bottom:16px;
+        ">
+            <button onclick="backToList()" style="
+                background:none; border:none; color:#555;
+                cursor:pointer; padding:0; font-size:18px;
+            ">←</button>
+            <span style="font-size:11px; letter-spacing:2px; color:#555; font-family:monospace;">
+                ${roomId.slice(0,8).toUpperCase()}
+            </span>
+        </div>
+
+        <div id="chat-messages" style="
+            overflow-y:auto;
+            padding-bottom:70px;
+            min-height:200px;
+        "></div>
+
+        <div style="
+            position:fixed; bottom:70px; left:0; right:0;
+            padding:10px 16px;
+            background:#0a0a0a;
+            border-top:1px solid #1a1a1a;
+            display:flex; gap:8px;
+            z-index:60;
+        ">
+            <input id="room-input" type="text"
+                placeholder="메시지 입력..."
+                style="
+                    flex:1; background:#111; border:1px solid #222;
+                    border-radius:20px; padding:10px 16px;
+                    color:#fff; font-size:14px; outline:none;
+                "
+            />
+            <button onclick="submitRoomMessage()" style="
+                background:none; border:1px solid #333;
+                border-radius:50%; width:40px; height:40px;
+                color:#aaa; cursor:pointer; font-size:16px;
+                display:flex; align-items:center; justify-content:center;
+                flex-shrink:0;
+            ">↑</button>
+        </div>
+    `
+
+    setTimeout(() => {
+        const inp = document.getElementById("room-input")
+        if (inp) inp.onkeypress = (e) => { if (e.key === "Enter") submitRoomMessage() }
+    }, 100)
+}
+
+// ─── 메시지 로드 ─────────────────────────────────────────────
+async function loadMessages(roomId) {
+    try {
+        const res = await fetch(`/api/corechat?action=get-messages&room_id=${roomId}`)
+        const messages = await res.json()
+        renderMessages(messages)
+    } catch(e) {
+        console.error('[rooms] 메시지 로드 실패', e)
+    }
+}
+
+function renderMessages(messages) {
+    const container = document.getElementById("chat-messages")
+    if (!container) return
+
+    if (!messages || messages.length === 0) {
+        container.innerHTML = `
+            <div style="
+                text-align:center; padding:40px 0;
+                color:#333; font-size:12px;
+            ">첫 메시지를 보내보세요.</div>
+        `
+        return
+    }
+
+    container.innerHTML = ""
+    messages.forEach(msg => {
+        const div = document.createElement("div")
+        const time = new Date(msg.created_at).toLocaleTimeString('ko-KR', {
+            hour:'2-digit', minute:'2-digit'
+        })
+
+        div.style.cssText = `
+            margin-bottom:12px;
+            display:flex;
+            flex-direction:column;
+            align-items:flex-start;
+        `
+        div.innerHTML = `
+            <div style="
+                background:#151515; border:1px solid #222;
+                border-radius:16px 16px 16px 4px;
+                padding:10px 14px; max-width:80%;
+                font-size:14px; color:#ddd; line-height:1.5;
+            ">${msg.message}</div>
+            <div style="font-size:10px; color:#333; margin-top:4px; padding-left:4px;">
+                ${time}
+            </div>
+        `
+        container.appendChild(div)
+    })
+
+    container.scrollTop = container.scrollHeight
+}
+
+// ─── 메시지 전송 ─────────────────────────────────────────────
+async function submitRoomMessage() {
+    const inp = document.getElementById("room-input")
+    if (!inp) return
+
+    const message = inp.value.trim()
+    if (!message || !currentRoom) return
+
+    inp.value = ""
 
     try {
-        const {
-            user_id, source_locale, target_locale,
-            input_text, output_text, engine_used,
-            emotion_score, conflict_detected
-        } = req.body;
-
-        if (!input_text || !output_text || !engine_used)
-            return res.status(400).json({ error: 'input_text, output_text, engine_used 필수' });
-
-        const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/translation_logs`,
-            {
-                method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify({
-                    user_id:           user_id || null,
-                    source_locale:     source_locale || null,
-                    target_locale:     target_locale || null,
-                    input_text,
-                    output_text,
-                    engine_used,
-                    emotion_score:     emotion_score ?? null,
-                    conflict_detected: conflict_detected ?? false
-                })
-            }
-        );
-
-        if (!response.ok) throw new Error(await response.text());
-        return res.status(200).json({ ok: true });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
+        await fetch("/api/corechat?action=send-message", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room_id:   currentRoom,
+                sender_id: null,
+                message
+            })
+        })
+        await loadMessages(currentRoom)
+    } catch(e) {
+        console.error('[rooms] 메시지 전송 실패', e)
     }
 }
 
-// ─────────────────────────────────────────────
-// CREATE ROOM
-// ─────────────────────────────────────────────
-async function handleCreateRoom(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const { user_id, target_user_id, room_type = 'dm' } = req.body;
-
-    const { data: room, error } = await supabaseService
-        .from('chat_rooms')
-        .insert({ room_type, created_by: user_id })
-        .select()
-        .single();
-
-    if (error) return res.status(500).json(error);
-
-    await supabaseService.from('chat_participants').insert([
-        { room_id: room.id, user_id },
-        { room_id: room.id, user_id: target_user_id }
-    ]);
-
-    return res.json(room);
+// ─── 새 방 생성 ──────────────────────────────────────────────
+async function createNewRoom() {
+    try {
+        const res = await fetch("/api/corechat?action=create-room", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id:        null,
+                target_user_id: null,
+                room_type:      "dm"
+            })
+        })
+        const room = await res.json()
+        if (room.id) {
+            enterRoom(room.id)
+        }
+    } catch(e) {
+        console.error('[rooms] 방 생성 실패', e)
+    }
 }
 
-// ─────────────────────────────────────────────
-// GET MESSAGES
-// ─────────────────────────────────────────────
-async function handleGetMessages(req, res) {
-    const { room_id } = req.query;
-
-    const { data, error } = await supabaseAnon
-        .from('chat_messages')
-        .select('*')
-        .eq('room_id', room_id)
-        .order('created_at', { ascending: true });
-
-    if (error) return res.status(500).json(error);
-    return res.json(data);
+// ─── 목록으로 돌아가기 ───────────────────────────────────────
+function backToList() {
+    currentRoom = null
+    stopPolling()
+    loadRooms()
 }
 
-// ─────────────────────────────────────────────
-// SEND MESSAGE
-// ─────────────────────────────────────────────
-async function handleSendMessage(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const { room_id, sender_id, message } = req.body;
-
-    const { data, error } = await supabaseService
-        .from('chat_messages')
-        .insert({ room_id, sender_id, message })
-        .select();
-
-    if (error) return res.status(500).json(error);
-    return res.json(data);
+// ─── 폴링 (3초마다 새 메시지 확인) ──────────────────────────
+function startPolling(roomId) {
+    stopPolling()
+    chatPolling = setInterval(() => {
+        if (currentRoom && roomLayer.style.display !== "none") {
+            loadMessages(roomId)
+        }
+    }, 3000)
 }
 
-// ─────────────────────────────────────────────
-// JOIN ROOM
-// ─────────────────────────────────────────────
-async function handleJoinRoom(req, res) {
-    if (req.method !== 'POST') return res.status(405).end();
-
-    const { invite_code } = req.body;
-
-    const { data, error } = await supabaseService
-        .from('rooms')
-        .select('*')
-        .eq('invite_code', invite_code)
-        .single();
-
-    if (error) return res.status(404).json({ error: 'room not found' });
-    return res.json(data);
-}
-
-// ─────────────────────────────────────────────
-// GET ROOMS
-// ─────────────────────────────────────────────
-async function handleGetRooms(req, res) {
-    const { data, error } = await supabaseAnon
-        .from('chat_rooms')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) return res.status(500).json(error);
-    return res.json(data);
-}
-
-// ─────────────────────────────────────────────
-// CREATE SPACE
-// ─────────────────────────────────────────────
-async function handleCreateSpace(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const { room_id, space_type } = req.body;
-
-    const { data, error } = await supabaseService
-        .from('spaces')
-        .insert({ room_id, space_type })
-        .select();
-
-    if (error) return res.status(500).json(error);
-    return res.json(data);
-}
-
-// ─────────────────────────────────────────────
-// MAIN ROUTER
-// ─────────────────────────────────────────────
-export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') return res.status(200).end();
-
-    const action = req.query.action || req.body?.action;
-
-    switch (action) {
-        case 'chat':          return handleChat(req, res);
-        case 'log':           return handleLog(req, res);
-        case 'get-rooms':     return handleGetRooms(req, res);
-        case 'create-room':   return handleCreateRoom(req, res);
-        case 'get-messages':  return handleGetMessages(req, res);
-        case 'send-message':  return handleSendMessage(req, res);
-        case 'join-room':     return handleJoinRoom(req, res);
-        case 'create-space':  return handleCreateSpace(req, res);
-        default:
-            return res.status(400).json({ error: 'action 파라미터 필요 (chat | log | create-room | get-messages | send-message | join-room | create-space)' });
+function stopPolling() {
+    if (chatPolling) {
+        clearInterval(chatPolling)
+        chatPolling = null
     }
 }
