@@ -249,24 +249,28 @@ function openChatView(room, nickname) {
 
     roomList.innerHTML = `
         <!-- 헤더 -->
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="
+            display:flex; align-items:center; gap:12px;
+            margin:-20px -20px 16px -20px; padding:16px 20px;
+            background:#0d1a0d; border-bottom:1px solid #1a3a1a;
+        ">
             <button onclick="exitChatView()" style="
-                background:none; border:none; color:#666;
-                font-size:18px; cursor:pointer; padding:4px 8px;
+                background:none; border:none; color:#4a9a4a;
+                font-size:20px; cursor:pointer; padding:4px 8px;
             ">←</button>
             <div style="flex:1;">
-                <div style="font-size:14px; font-family:monospace; letter-spacing:2px; color:#ddd;">
-                    ${room.invite_code}
+                <div style="font-size:16px; font-family:monospace; letter-spacing:3px; color:#6aba6a; font-weight:700;">
+                    💬 ${room.invite_code}
                 </div>
-                <div style="font-size:11px; color:#555; margin-top:2px;">
-                    ${nickname} · ${DEVICE_ID.substr(0,8)}
+                <div style="font-size:12px; color:#4a7a4a; margin-top:2px;">
+                    ${nickname} 으로 입장 중
                 </div>
             </div>
             <button onclick="shareInviteCode('${room.invite_code}')" style="
-                background:none; border:1px solid #2a2a2a; color:#555;
-                padding:4px 10px; border-radius:12px;
-                font-size:10px; cursor:pointer; font-family:monospace;
-            ">초대</button>
+                background:#1a3a1a; border:1px solid #2a5a2a; color:#6aba6a;
+                padding:6px 14px; border-radius:12px;
+                font-size:11px; cursor:pointer; font-family:monospace;
+            ">+ 초대</button>
         </div>
 
         <!-- 메시지 영역 -->
@@ -374,20 +378,21 @@ function appendMessage(msg, scroll = true) {
     if (msg.id) wrapper.dataset.msgId = msg.id
 
     wrapper.innerHTML = `
-        <div style="font-size:10px; color:#444; margin-bottom:4px; font-family:monospace;">
-            ${nickname}
+        <div style="font-size:11px; color:${isMe ? '#6aba6a' : '#8a8aaa'}; margin-bottom:4px;
+            font-family:monospace; font-weight:600; letter-spacing:1px;">
+            ${isMe ? '👤 ' : '💬 '}${nickname}
         </div>
         <div style="
             max-width:75%; padding:12px 16px;
-            background:${isMe ? '#1e3a1e' : '#1a1a1a'};
-            border:1px solid ${isMe ? '#2a4a2a' : '#2a2a2a'};
+            background:${isMe ? '#0d1a0d' : '#111'};
+            border:1px solid ${isMe ? '#2a5a2a' : '#2a2a3a'};
             border-radius:${isMe ? '20px 4px 20px 20px' : '4px 20px 20px 20px'};
-            color:#ddd; font-size:14px; line-height:1.6;
+            color:${isMe ? '#b0d8b0' : '#c0c0dd'}; font-size:14px; line-height:1.6;
         ">
             ${content}
-            ${original ? `<div style="font-size:11px; color:#555; margin-top:6px; border-top:1px solid #2a2a2a; padding-top:6px;">${original}</div>` : ''}
+            ${original ? `<div style="font-size:11px; color:#556; margin-top:6px; border-top:1px solid #2a2a3a; padding-top:6px;">${original}</div>` : ''}
         </div>
-        <div style="font-size:10px; color:#333; margin-top:4px;">${time}</div>
+        <div style="font-size:10px; color:#444; margin-top:4px;">${time}</div>
     `
 
     container.appendChild(wrapper)
