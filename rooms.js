@@ -414,27 +414,82 @@ async function createNewRoom() {
 function shareInviteCode(code) {
     const link      = `https://corering.vercel.app/?room=${code}`
     const shareText = `CoreRing 채팅방 초대\n👉 ${link}`
-    if (navigator.share) {
+
+    // navigator.share 지원 + HTTPS 환경에서만 사용
+    const canShare = navigator.share && 
+                     window.isSecureContext && 
+                     /android|iphone|ipad|ipod/i.test(navigator.userAgent)
+
+    if (canShare) {
         navigator.share({ title: 'CoreRing 초대', text: shareText, url: link })
-            .catch(() => copyToClipboard(shareText, code))
+            .catch(() => showShareOptions(shareText, code, link))
     } else {
-        copyToClipboard(shareText, code)
+        showShareOptions(shareText, code, link)
     }
 }
 
-function copyToClipboard(text, code) {
-    navigator.clipboard.writeText(text)
-        .then(() => showRoomToast(`📋 ${code} 링크 복사됨!`))
-        .catch(() => {
-            const ta = document.createElement('textarea')
-            ta.value = text
-            ta.style.cssText = 'position:fixed; opacity:0;'
-            document.body.appendChild(ta)
-            ta.select()
-            document.execCommand('copy')
-            document.body.removeChild(ta)
-            showRoomToast(`📋 ${code} 링크 복사됨!`)
-        })
+function showShareOptions(shareText, code, link) {
+    const existing = document.getElementById('share-modal')
+    if (existing) existing.remove()
+
+    const modal = document.createElement('div')
+    modal.id = 'share-modal'
+    modal.style.cssText = `
+        position:fixed; inset:0; background:rgba(0,0,0,0.85);
+        display:flex; align-items:flex-end; justify-content:center;
+        z-index:300; padding:20px;
+    `
+    modal.innerHTML = `
+        <div style="
+            background:#111; border:1px solid #2a2a2a;
+            border-radius:24px; padding:24px;
+            width:100%; max-width:400px; margin-bottom:20px;
+        ">
+            <div style="font-size:11px; letter-spacing:3px; color:#555; margin-bottom:16px;">초대 코드</div>
+            <div style="
+                font-size:28px; font-family:monospace; letter-spacing:6px;
+                color:#fff; text-align:center;
+                background:#0a0a0a; border-radius:16px; padding:20px;
+                margin-bottom:20px;
+            ">${code}</div>
+
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}"
+                   target="_blank" style="
+                    display:block; text-align:center;
+                    background:#25D366; color:#fff;
+                    padding:14px; border-radius:16px;
+                    font-size:14px; text-decoration:none; font-weight:600;
+                ">WhatsApp으로 공유</a>
+
+                <a href="https://zalo.me/share?text=${encodeURIComponent(shareText)}"
+                   target="_blank" style="
+                    display:block; text-align:center;
+                    background:#0068FF; color:#fff;
+                    padding:14px; border-radius:16px;
+                    font-size:14px; text-decoration:none; font-weight:600;
+                ">잘로(Zalo)로 공유</a>
+
+                <button onclick="
+                    navigator.clipboard.writeText('${shareText.replace(/'/g, "\\'")}')
+                    .then(()=>{ document.getElementById('share-modal').remove(); showRoomToast('📋 링크 복사됨!') })
+                " style="
+                    background:#1a1a1a; border:1px solid #333; color:#aaa;
+                    padding:14px; border-radius:16px;
+                    font-size:14px; cursor:pointer;
+                ">링크 복사</button>
+            </div>
+
+            <button onclick="document.getElementById('share-modal').remove()" style="
+                width:100%; margin-top:12px;
+                background:none; border:1px solid #2a2a2a; color:#555;
+                padding:12px; border-radius:16px;
+                font-size:13px; cursor:pointer;
+            ">닫기</button>
+        </div>
+    `
+    document.body.appendChild(modal)
+    modal.onclick = (e) => { if (e.target === modal) modal.remove() }
 }
 
 // ─── Supabase Realtime 구독 ──────────────────────────────────
