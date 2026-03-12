@@ -66,10 +66,10 @@ async function handleGetRooms(req, res) {
 
 async function handleCreateRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { user_id, room_type = 'dm' } = req.body;
+    const { user_id, room_type = 'dm', space_id = null } = req.body;
     const { data: room, error } = await supabaseService
         .from('chat_rooms')
-        .insert({ room_type, created_by: user_id || null })
+        .insert({ room_type, created_by: user_id || null, space_id })
         .select()
         .single();
     if (error) return res.status(500).json(error);
@@ -93,10 +93,19 @@ async function handleSendMessage(req, res) {
 
 async function handleJoinRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
-    const { invite_code } = req.body;
-    const { data, error } = await supabaseService.from('rooms').select('*').eq('invite_code', invite_code).single();
-    if (error) return res.status(404).json({ error: 'room not found' });
-    return res.json(data);
+    const { invite_code, nickname, role = 'guest' } = req.body;
+    const { data: room, error } = await supabaseService
+        .from('chat_rooms')
+        .select('*')
+        .eq('invite_code', invite_code.toUpperCase())
+        .single();
+    if (error) return res.status(404).json({ error: '존재하지 않는 초대 코드입니다.' });
+    await supabaseService.from('chat_participants').insert({
+        room_id: room.id,
+        nickname: nickname || null,
+        role
+    });
+    return res.json(room);
 }
 
 async function handleCreateSpace(req, res) {
