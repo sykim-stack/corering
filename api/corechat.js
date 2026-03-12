@@ -157,7 +157,7 @@ async function getMessages(req, res) {
     .eq("room_id", room_id)
     .order("created_at", { ascending: true })
 
-    if (after) query = query.gt("created_at", after)
+  if (after) query = query.gt("created_at", new Date(after).toISOString())
 
   const { data, error } = await query
 
@@ -178,12 +178,12 @@ async function deleteRoom(req, res) {
   // 방장 확인
   const { data: room } = await supabase
     .from("rooms")
-    .select("owner_id")
+    .select("owner_device_id")
     .eq("id", room_id)
     .single()
 
   if (!room) return res.status(404).json({ error: "room not found" })
-  if (room.owner_id !== device_id) return res.status(403).json({ error: "not owner" })
+  if (room.owner_device_id !== device_id) return res.status(403).json({ error: "not owner" })
 
   await supabase.from("rooms").delete().eq("id", room_id)
 
