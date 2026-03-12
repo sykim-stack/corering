@@ -342,9 +342,10 @@ function renderMessages(messages) {
     messages.forEach(msg => appendMessage(msg, false))
     container.scrollTop = container.scrollHeight
 
-    if (messages.length > 0) {
-        lastMsgTimestamp = messages[messages.length - 1].created_at
-    }
+    // 마지막 타임스탬프 설정 (없으면 현재 시각 기준)
+    lastMsgTimestamp = messages.length > 0
+        ? messages[messages.length - 1].created_at
+        : new Date().toISOString()
 }
 
 function appendMessage(msg, scroll = true) {
@@ -424,20 +425,22 @@ function startPolling(roomId) {
         if (!currentRoom || !document.getElementById("chat-messages")) {
             stopPolling(); return
         }
+        if (!lastMsgTimestamp) return  // loadMessages 완료 전엔 skip
         try {
-            const url = lastMsgTimestamp
-                ? `/api/corechat?action=get-messages&room_id=${roomId}&after=${encodeURIComponent(lastMsgTimestamp)}`
-                : `/api/corechat?action=get-messages&room_id=${roomId}`
+            const url = `/api/corechat?action=get-messages&room_id=${roomId}&after=${encodeURIComponent(lastMsgTimestamp)}`
             const res  = await fetch(url)
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
 
-            // 상대방 메시지만 추가 (내 것은 낙관적 UI로 이미 표시됨)
-            msgs.filter(m => m.device_id !== DEVICE_ID).forEach(m => appendMessage(m))
-
-            if (msgs.length > 0) {
-                lastMsgTimestamp = msgs[msgs.length - 1].created_at
-            }
+            msgs.forEach(m => {
+                // 내 메시지는 낙관적 UI로 이미 표시됨 → skip
+                if (m.device_id === DEVICE_ID) {
+                    // 하지만 타임스탬프는 업데이트
+                } else {
+                    appendMessage(m)
+                }
+            })
+            lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
     }, 3000)
 }
