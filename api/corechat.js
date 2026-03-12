@@ -66,10 +66,13 @@ async function handleGetRooms(req, res) {
 
 async function handleCreateRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { user_id, target_user_id, room_type = 'dm' } = req.body;
-    const { data: room, error } = await supabaseService.from('chat_rooms').insert({ room_type, created_by: user_id }).select().single();
+    const { user_id, room_type = 'dm' } = req.body;
+    const { data: room, error } = await supabaseService
+        .from('chat_rooms')
+        .insert({ room_type, created_by: user_id || null })
+        .select()
+        .single();
     if (error) return res.status(500).json(error);
-    await supabaseService.from('chat_participants').insert([{ room_id: room.id, user_id }, { room_id: room.id, user_id: target_user_id }]);
     return res.json(room);
 }
 
