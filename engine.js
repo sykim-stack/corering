@@ -471,7 +471,7 @@ async function handleSend() {
     // ── RING 모드 (DeepL) ──
     try {
         const target         = isKorean ? 'VI' : 'KO';
-        const res            = await fetch(`/api/translate?text=${encodeURIComponent(text)}&target=${target}`);
+        const res            = await fetch(`/api/corering?text=${encodeURIComponent(text)}&target=${target}`);
         const data           = await res.json();
         const rawTranslation = data.translations[0].text;
 
