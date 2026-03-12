@@ -357,12 +357,16 @@ function appendMessage(msg, scroll = true) {
     const original  = (msg.translated_ko || msg.translated_vi) ? msg.message : null
     const time      = new Date(msg.created_at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
 
+    // 중복 방지: data-msg-id로 이미 있으면 skip
+    if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return
+
     const wrapper = document.createElement('div')
     wrapper.style.cssText = `
         display:flex;
         flex-direction:column;
-        align-items:${isMe ? 'flex-start' : 'flex-end'};
+        align-items:${isMe ? 'flex-end' : 'flex-start'};
     `
+    if (msg.id) wrapper.dataset.msgId = msg.id
 
     wrapper.innerHTML = `
         <div style="font-size:10px; color:#444; margin-bottom:4px; font-family:monospace;">
@@ -370,9 +374,9 @@ function appendMessage(msg, scroll = true) {
         </div>
         <div style="
             max-width:75%; padding:12px 16px;
-            background:${isMe ? '#1a1a1a' : '#111'};
-            border:1px solid ${isMe ? '#2a2a2a' : '#1e3a1e'};
-            border-radius:${isMe ? '4px 20px 20px 20px' : '20px 4px 20px 20px'};
+            background:${isMe ? '#1e3a1e' : '#1a1a1a'};
+            border:1px solid ${isMe ? '#2a4a2a' : '#2a2a2a'};
+            border-radius:${isMe ? '20px 4px 20px 20px' : '4px 20px 20px 20px'};
             color:#ddd; font-size:14px; line-height:1.6;
         ">
             ${content}
@@ -400,8 +404,9 @@ async function sendChatMessage() {
         message:   text,
     }
 
-    // 낙관적 UI (바로 표시)
-    appendMessage({ ...msg, created_at: new Date().toISOString() })
+    // 낙관적 UI (바로 표시) - 임시 id로 중복 방지
+    const tempId = 'temp_' + Date.now()
+    appendMessage({ ...msg, id: tempId, created_at: new Date().toISOString() })
 
     try {
         await fetch("/api/corechat?action=send-message", {
@@ -427,14 +432,8 @@ function startPolling(roomId) {
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
 
-            // 상대방 메시지만 추가
-            const newMsgs = lastMsgTimestamp
-                ? msgs
-                : msgs.filter(m => m.device_id !== DEVICE_ID)
-
-            newMsgs.forEach(m => {
-                if (m.device_id !== DEVICE_ID) appendMessage(m)
-            })
+            // 상대방 메시지만 추가 (내 것은 낙관적 UI로 이미 표시됨)
+            msgs.filter(m => m.device_id !== DEVICE_ID).forEach(m => appendMessage(m))
 
             if (msgs.length > 0) {
                 lastMsgTimestamp = msgs[msgs.length - 1].created_at
