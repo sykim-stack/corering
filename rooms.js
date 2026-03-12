@@ -440,7 +440,7 @@ function startPolling(roomId) {
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
             msgs.forEach(m => {
-                if (m.device_id !== DEVICE_ID) appendMessage(m)
+                appendMessage(m)  // device_id 체크 제거
             })
             lastMsgTimestamp = new Date(msgs[msgs.length - 1].created_at).toISOString()
         } catch(e) {}
