@@ -398,9 +398,7 @@ async function sendChatMessage() {
     const inp = document.getElementById("chat-input")
     if (!inp || !currentRoom) return
     const text = inp.value.trim()
-    console.log("[chat] currentRoom:", currentRoom)  // ← 추가
     if (!text) return
-    console.log("[chat] sending:", text, currentRoom)  // ← 추가
     inp.value = ""
 
     const msg = {
@@ -410,9 +408,7 @@ async function sendChatMessage() {
         message:   text,
     }
 
-    // 낙관적 UI (바로 표시) - 임시 id로 중복 방지
-    const tempId = 'temp_' + Date.now()
-    appendMessage({ ...msg, id: tempId, created_at: new Date().toISOString() })
+    // ← 낙관적 UI 블록 전체 제거 (tempId 부분)
 
     try {
         await fetch("/api/corechat?action=send-message", {
