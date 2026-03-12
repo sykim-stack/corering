@@ -421,24 +421,21 @@ async function sendChatMessage() {
 // ─── 폴링 ────────────────────────────────────────────────────
 function startPolling(roomId) {
     stopPolling()
+    // 폴링 시작 시각 기록 → 이후 새 메시지만 수신
+    if (!lastMsgTimestamp) {
+        lastMsgTimestamp = new Date().toISOString()
+    }
     pollingTimer = setInterval(async () => {
         if (!currentRoom || !document.getElementById("chat-messages")) {
             stopPolling(); return
         }
-        if (!lastMsgTimestamp) return  // loadMessages 완료 전엔 skip
         try {
             const url = `/api/corechat?action=get-messages&room_id=${roomId}&after=${encodeURIComponent(lastMsgTimestamp)}`
             const res  = await fetch(url)
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
-
             msgs.forEach(m => {
-                // 내 메시지는 낙관적 UI로 이미 표시됨 → skip
-                if (m.device_id === DEVICE_ID) {
-                    // 하지만 타임스탬프는 업데이트
-                } else {
-                    appendMessage(m)
-                }
+                if (m.device_id !== DEVICE_ID) appendMessage(m)
             })
             lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
@@ -544,6 +541,7 @@ function showShareOptions(shareText, code, link) {
         display:flex; align-items:flex-end; justify-content:center;
         z-index:300; padding:20px;
     `
+    const encodedText = encodeURIComponent(shareText)
     modal.innerHTML = `
         <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px; padding:24px;
             width:100%; max-width:400px; margin-bottom:20px;">
@@ -553,14 +551,14 @@ function showShareOptions(shareText, code, link) {
                 ${code}
             </div>
             <div style="display:flex; flex-direction:column; gap:10px;">
-                <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}"
-                   target="_blank" style="display:block; text-align:center; background:#25D366;
-                   color:#fff; padding:14px; border-radius:16px; font-size:14px;
-                   text-decoration:none; font-weight:600;">WhatsApp으로 공유</a>
-                <a href="https://zalo.me/share?text=${encodeURIComponent(shareText)}"
+                <a href="https://zalo.me/share?text=${encodedText}"
                    target="_blank" style="display:block; text-align:center; background:#0068FF;
                    color:#fff; padding:14px; border-radius:16px; font-size:14px;
                    text-decoration:none; font-weight:600;">잘로(Zalo)로 공유</a>
+                <a href="https://open.kakao.com/o/share?text=${encodedText}"
+                   target="_blank" style="display:block; text-align:center; background:#FAE100;
+                   color:#3A1D1D; padding:14px; border-radius:16px; font-size:14px;
+                   text-decoration:none; font-weight:600;">카카오로 공유</a>
                 <button onclick="navigator.clipboard.writeText('${link}').then(()=>{document.getElementById('share-modal').remove();showRoomToast('📋 링크 복사됨!')})" style="
                     background:#1a1a1a; border:1px solid #333; color:#aaa;
                     padding:14px; border-radius:16px; font-size:14px; cursor:pointer;">링크 복사</button>
