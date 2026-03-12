@@ -157,7 +157,7 @@ async function getMessages(req, res) {
     .eq("room_id", room_id)
     .order("created_at", { ascending: true })
 
-  if (after) query = query.gt("created_at", new Date(after).toISOString())
+    if (after) query = query.gt("created_at", after)
 
   const { data, error } = await query
 

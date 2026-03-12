@@ -442,7 +442,7 @@ function startPolling(roomId) {
             msgs.forEach(m => {
                 appendMessage(m)  // device_id 체크 제거
             })
-            lastMsgTimestamp = new Date(msgs[msgs.length - 1].created_at).toISOString()
+            lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
     }, 3000)
 }
