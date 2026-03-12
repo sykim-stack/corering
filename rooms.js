@@ -575,6 +575,7 @@ function showShareOptions(shareText, code, link) {
 
 // ─── 번역 결과 자동 저장 (engine.js에서 호출) ────────────────
 async function sendTranslationToRoom(original, translated, direction) {
+    console.log('[rooms] sendTranslationToRoom 호출', currentRoom?.id)  // ← 추가
     if (!currentRoom) return
     try {
         await fetch("/api/corechat?action=send-message", {
@@ -589,6 +590,7 @@ async function sendTranslationToRoom(original, translated, direction) {
                 translated_vi: direction === 'KO→VI' ? translated : null,
             })
         })
+        console.log('[rooms] 번역저장 응답', await res.json())  // ← 추가
     } catch(e) { console.error('[rooms] 번역 저장 실패', e) }
 }
 
