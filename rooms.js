@@ -227,12 +227,13 @@ async function doJoin(code, nickname) {
 // ─── 닉네임 확인 후 입장 ─────────────────────────────────────
 function enterRoomWithNickname(room) {
     const nickname = getNickname()
-    if (nickname) {
-        openChatView(room, nickname)
+    if (nickname && nickname.trim()) {
+        openChatView(room, nickname.trim())
     } else {
+        localStorage.removeItem('cr_nickname')  // 혹시 빈 값 제거
         showNicknameModal({ onConfirm: (name) => {
-            saveNickname(name)
-            openChatView(room, name)
+            saveNickname(name.trim())
+            openChatView(room, name.trim())
         }})
     }
 }
@@ -242,7 +243,8 @@ function enterRoomWithNickname(room) {
 // ============================================================
 function openChatView(room, nickname) {
     currentRoom = { ...room, nickname }
-    lastMsgTimestamp = null
+    // 폴링 기준시각 먼저 설정 (loadMessages 완료 전 새 메시지 유실 방지)
+    lastMsgTimestamp = new Date().toISOString()
 
     roomList.innerHTML = `
         <!-- 헤더 -->
@@ -342,10 +344,11 @@ function renderMessages(messages) {
     messages.forEach(msg => appendMessage(msg, false))
     container.scrollTop = container.scrollHeight
 
-    // 마지막 타임스탬프 설정 (없으면 현재 시각 기준)
-    lastMsgTimestamp = messages.length > 0
-        ? messages[messages.length - 1].created_at
-        : new Date().toISOString()
+    // 기존 메시지 중 가장 최신 타임스탬프로 업데이트 (폴링 기준점)
+    if (messages.length > 0) {
+        const latest = messages[messages.length - 1].created_at
+        if (latest > lastMsgTimestamp) lastMsgTimestamp = latest
+    }
 }
 
 function appendMessage(msg, scroll = true) {
