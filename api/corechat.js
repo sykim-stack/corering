@@ -181,14 +181,14 @@ async function handleDeleteRoom(req, res) {
 // GET MESSAGES
 // ─────────────────────────────────────────────
 async function handleGetMessages(req, res) {
-    const { room_id } = req.query;
-
-    const { data, error } = await supabaseAnon
+    const { room_id, after } = req.query;
+    let query = supabaseAnon
         .from('chat_messages')
         .select('*')
         .eq('room_id', room_id)
         .order('created_at', { ascending: true });
-
+    if (after) query = query.gt('created_at', after);
+    const { data, error } = await query;
     if (error) return res.status(500).json(error);
     return res.json(data);
 }

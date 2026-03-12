@@ -1,23 +1,23 @@
 // ============================================================
-// BRAINPOOL | CoreRing rooms.js v5.0
-// - 닉네임 입력 → 방 입장
-// - device_id 기반 내/상대 구분
-// - 내 메시지 왼쪽 / 상대방 오른쪽
-// - Supabase Realtime 실시간 수신
-// - 방 삭제 (방장만) / 나가기
+// BRAINPOOL | CoreRing rooms.js v6.0
+// - 방 목록 → 방 클릭 → 채팅 화면 (레이어)
+// - 닉네임 표시, 내 메시지 왼쪽 / 상대 오른쪽
+// - 3초 폴링 실시간 수신
+// - 나가기 → 번역기로 복귀
+// - 방 삭제 (방장만)
 // - 번역 결과 자동 저장
-// - URL 링크로 자동 입장
 // ============================================================
 
 const roomLayer  = document.getElementById("room-layer")
 const roomList   = document.getElementById("room-list")
 const roomToggle = document.getElementById("room-toggle")
 
-let rooms       = []
-let currentRoom = null
-let realtimeChannel = null
+let rooms            = []
+let currentRoom      = null
+let pollingTimer     = null
+let lastMsgTimestamp = null
 
-// ─── device_id 생성/로드 ─────────────────────────────────────
+// ─── device_id / nickname ────────────────────────────────────
 function getDeviceId() {
     let id = localStorage.getItem('cr_device_id')
     if (!id) {
@@ -26,36 +26,21 @@ function getDeviceId() {
     }
     return id
 }
-
-function getNickname() {
-    return localStorage.getItem('cr_nickname') || null
-}
-
-function saveNickname(name) {
-    localStorage.setItem('cr_nickname', name)
-}
+function getNickname()        { return localStorage.getItem('cr_nickname') || null }
+function saveNickname(name)   { localStorage.setItem('cr_nickname', name) }
 
 const DEVICE_ID = getDeviceId()
-
-// ─── Supabase Realtime 설정 ──────────────────────────────────
-const SUPABASE_URL = 'https://' + (()=>{
-    // URL에서 supabase 프로젝트 ID 추출 불가 → API 통해 처리
-    return ''
-})()
 
 // ─── URL 자동 입장 ───────────────────────────────────────────
 ;(async function autoJoinFromURL() {
     const params = new URLSearchParams(window.location.search)
     const code   = params.get('room')
     if (!code) return
-
     window.history.replaceState({}, '', window.location.pathname)
-
     const nickname = getNickname()
     if (nickname) {
         await doJoin(code.toUpperCase(), nickname)
     } else {
-        // 닉네임 없으면 입력 모달 표시
         showNicknameModal({ onConfirm: async (name) => {
             saveNickname(name)
             await doJoin(code.toUpperCase(), name)
@@ -68,15 +53,18 @@ roomToggle.addEventListener("click", toggleRooms)
 
 function toggleRooms() {
     if (roomLayer.style.display === "none") {
-        loadRooms()
+        showRoomListView()
         roomLayer.style.display = "block"
     } else {
         roomLayer.style.display = "none"
     }
 }
 
-// ─── 방 목록 ─────────────────────────────────────────────────
-async function loadRooms() {
+// ============================================================
+// VIEW: 방 목록
+// ============================================================
+async function showRoomListView() {
+    roomLayer.style.display = "block"
     roomList.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <span style="font-size:11px; letter-spacing:3px; color:#555;">CHAT ROOMS</span>
@@ -97,21 +85,19 @@ async function loadRooms() {
             <div style="color:#333; font-size:12px; text-align:center; padding:20px 0;">불러오는 중...</div>
         </div>
     `
-
     try {
         const res = await fetch("/api/corechat?action=get-rooms")
         rooms = await res.json()
-        renderRoomList()
+        renderRoomItems()
     } catch(e) {
         const el = document.getElementById("room-items")
         if (el) el.innerHTML = `<div style="color:#555; font-size:12px; padding:20px 0; text-align:center;">불러올 수 없습니다.</div>`
     }
 }
 
-function renderRoomList() {
+function renderRoomItems() {
     const container = document.getElementById("room-items")
     if (!container) return
-
     if (!rooms || rooms.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:40px 0; color:#444; font-size:12px; line-height:2;">
@@ -120,7 +106,6 @@ function renderRoomList() {
             </div>`
         return
     }
-
     container.innerHTML = ""
     rooms.forEach(room => {
         const isActive = currentRoom?.id === room.id
@@ -134,7 +119,6 @@ function renderRoomList() {
         `
         div.onmouseenter = () => div.style.background = "#111"
         div.onmouseleave = () => div.style.background = isActive ? "#111" : "none"
-
         div.innerHTML = `
             <div style="display:flex; align-items:center; gap:12px;">
                 <div style="
@@ -155,20 +139,14 @@ function renderRoomList() {
             </div>
             <div style="display:flex; gap:6px;">
                 <button onclick="event.stopPropagation(); shareInviteCode('${room.invite_code}')" style="
-                    background:none; border:1px solid #2a2a2a;
-                    color:#555; padding:4px 10px; border-radius:12px;
+                    background:none; border:1px solid #2a2a2a; color:#555;
+                    padding:4px 10px; border-radius:12px;
                     font-size:10px; cursor:pointer; font-family:monospace;
                 ">공유</button>
-                ${isActive ? `
-                <button onclick="event.stopPropagation(); leaveRoom()" style="
-                    background:none; border:1px solid #2a2a2a;
-                    color:#666; padding:4px 10px; border-radius:12px;
-                    font-size:10px; cursor:pointer; font-family:monospace;
-                ">나가기</button>` : ''}
                 ${isOwner ? `
                 <button onclick="event.stopPropagation(); deleteRoom('${room.id}')" style="
-                    background:none; border:1px solid #3a1a1a;
-                    color:#a55; padding:4px 10px; border-radius:12px;
+                    background:none; border:1px solid #3a1a1a; color:#a55;
+                    padding:4px 10px; border-radius:12px;
                     font-size:10px; cursor:pointer; font-family:monospace;
                 ">삭제</button>` : ''}
             </div>
@@ -178,80 +156,10 @@ function renderRoomList() {
     })
 }
 
-// ─── 닉네임 확인 후 입장 ─────────────────────────────────────
-function enterRoomWithNickname(room) {
-    const nickname = getNickname()
-    if (nickname) {
-        enterRoom(room, nickname)
-    } else {
-        showNicknameModal({ onConfirm: (name) => {
-            saveNickname(name)
-            enterRoom(room, name)
-        }})
-    }
-}
-
-// ─── 닉네임 모달 ─────────────────────────────────────────────
-function showNicknameModal({ onConfirm }) {
-    const existing = document.getElementById('nickname-modal')
-    if (existing) existing.remove()
-
-    const overlay = document.createElement('div')
-    overlay.id = 'nickname-modal'
-    overlay.style.cssText = `
-        position:fixed; inset:0; background:rgba(0,0,0,0.85);
-        display:flex; align-items:center; justify-content:center;
-        z-index:200; padding:20px;
-    `
-    overlay.innerHTML = `
-        <div style="
-            background:#111; border:1px solid #2a2a2a;
-            border-radius:24px; padding:32px 24px;
-            width:100%; max-width:320px;
-        ">
-            <div style="font-size:11px; letter-spacing:3px; color:#555; margin-bottom:16px;">NICKNAME</div>
-            <div style="font-size:18px; font-weight:700; color:#fff; margin-bottom:24px;">
-                채팅에서 사용할 이름
-            </div>
-            <input id="nickname-input" type="text" maxlength="20"
-                placeholder="상요이"
-                style="
-                    width:100%; background:#0a0a0a; border:1px solid #333;
-                    border-radius:12px; padding:14px 16px;
-                    color:#fff; font-size:16px; outline:none;
-                    box-sizing:border-box; margin-bottom:16px;
-                "
-            />
-            <button id="nickname-confirm" style="
-                width:100%; background:#fff; border:none;
-                border-radius:16px; padding:16px;
-                color:#000; font-size:16px; font-weight:800;
-                cursor:pointer;
-            ">입장</button>
-        </div>
-    `
-    document.body.appendChild(overlay)
-
-    const inp = document.getElementById('nickname-input')
-    const btn = document.getElementById('nickname-confirm')
-    inp.focus()
-
-    const confirm = () => {
-        const name = inp.value.trim()
-        if (!name) { inp.style.borderColor = '#a55'; return }
-        overlay.remove()
-        onConfirm(name)
-    }
-
-    btn.onclick    = confirm
-    inp.onkeypress = (e) => { if (e.key === 'Enter') confirm() }
-}
-
 // ─── 코드 입력 박스 ──────────────────────────────────────────
 function showJoinInput() {
     const container = document.getElementById("room-items")
     if (!container || document.getElementById("join-box")) return
-
     container.insertAdjacentHTML('afterbegin', `
         <div id="join-box" style="
             background:#111; border:1px solid #2a2a2a;
@@ -259,24 +167,18 @@ function showJoinInput() {
         ">
             <div style="font-size:11px; color:#555; letter-spacing:2px; margin-bottom:10px;">초대 코드 입력</div>
             <div style="display:flex; gap:8px;">
-                <input id="join-code-input" type="text" maxlength="6"
-                    placeholder="A3K9X2"
-                    style="
-                        flex:1; background:#0a0a0a; border:1px solid #333;
-                        border-radius:10px; padding:10px 14px;
-                        color:#fff; font-size:16px; font-family:monospace;
-                        letter-spacing:3px; outline:none; text-transform:uppercase;
-                    "
+                <input id="join-code-input" type="text" maxlength="6" placeholder="A3K9X2"
+                    style="flex:1; background:#0a0a0a; border:1px solid #333; border-radius:10px;
+                    padding:10px 14px; color:#fff; font-size:16px; font-family:monospace;
+                    letter-spacing:3px; outline:none; text-transform:uppercase;"
                 />
                 <button onclick="joinByCode()" style="
-                    background:none; border:1px solid #444;
-                    color:#aaa; padding:10px 16px; border-radius:10px;
-                    font-size:12px; cursor:pointer;
+                    background:none; border:1px solid #444; color:#aaa;
+                    padding:10px 16px; border-radius:10px; font-size:12px; cursor:pointer;
                 ">입장</button>
             </div>
         </div>
     `)
-
     const inp = document.getElementById("join-code-input")
     if (!inp) return
     inp.focus()
@@ -295,70 +197,254 @@ async function joinByCode() {
     if (!inp) return
     const code = inp.value.trim().toUpperCase()
     if (code.length !== 6) { showRoomToast('6자리 코드를 입력하세요'); return }
-    await doJoin(code)
+    const nickname = getNickname()
+    if (nickname) {
+        await doJoin(code, nickname)
+    } else {
+        showNicknameModal({ onConfirm: async (name) => {
+            saveNickname(name)
+            await doJoin(code, name)
+        }})
+    }
 }
 
 async function doJoin(code, nickname) {
-    const name = nickname || getNickname()
     try {
         const res = await fetch("/api/corechat?action=join-room", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                invite_code: code,
-                nickname:    name || '익명',
-                device_id:   DEVICE_ID
-            })
+            body: JSON.stringify({ invite_code: code, nickname: nickname || '익명', device_id: DEVICE_ID })
         })
         const room = await res.json()
         if (room.id) {
-            enterRoom(room, name || '익명')
+            openChatView(room, nickname || '익명')
         } else {
             showRoomToast('존재하지 않는 코드입니다.')
         }
-    } catch(e) {
-        showRoomToast('입장 실패')
+    } catch(e) { showRoomToast('입장 실패') }
+}
+
+// ─── 닉네임 확인 후 입장 ─────────────────────────────────────
+function enterRoomWithNickname(room) {
+    const nickname = getNickname()
+    if (nickname) {
+        openChatView(room, nickname)
+    } else {
+        showNicknameModal({ onConfirm: (name) => {
+            saveNickname(name)
+            openChatView(room, name)
+        }})
     }
 }
 
-// ─── 방 입장 ─────────────────────────────────────────────────
-function enterRoom(room, nickname) {
-    currentRoom = { ...room, nickname: nickname || getNickname() || '익명' }
-    roomLayer.style.display = "none"
+// ============================================================
+// VIEW: 채팅 화면
+// ============================================================
+function openChatView(room, nickname) {
+    currentRoom = { ...room, nickname }
+    lastMsgTimestamp = null
+
+    roomList.innerHTML = `
+        <!-- 헤더 -->
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <button onclick="exitChatView()" style="
+                background:none; border:none; color:#666;
+                font-size:18px; cursor:pointer; padding:4px 8px;
+            ">←</button>
+            <div style="flex:1;">
+                <div style="font-size:14px; font-family:monospace; letter-spacing:2px; color:#ddd;">
+                    ${room.invite_code}
+                </div>
+                <div style="font-size:11px; color:#555; margin-top:2px;">
+                    ${nickname} · ${DEVICE_ID.substr(0,8)}
+                </div>
+            </div>
+            <button onclick="shareInviteCode('${room.invite_code}')" style="
+                background:none; border:1px solid #2a2a2a; color:#555;
+                padding:4px 10px; border-radius:12px;
+                font-size:10px; cursor:pointer; font-family:monospace;
+            ">초대</button>
+        </div>
+
+        <!-- 메시지 영역 -->
+        <div id="chat-messages" style="
+            flex:1; overflow-y:auto;
+            display:flex; flex-direction:column; gap:12px;
+            padding-bottom:16px;
+            height: calc(100% - 140px);
+        ">
+            <div style="color:#333; font-size:12px; text-align:center; padding:20px 0;">불러오는 중...</div>
+        </div>
+
+        <!-- 입력 영역 -->
+        <div style="
+            position:sticky; bottom:0;
+            background:#0a0a0a; padding:12px 0 0;
+            border-top:1px solid #1a1a1a;
+            display:flex; gap:8px;
+        ">
+            <input id="chat-input" type="text" placeholder="메시지 입력..."
+                style="
+                    flex:1; background:#111; border:1px solid #2a2a2a;
+                    border-radius:24px; padding:12px 18px;
+                    color:#fff; font-size:14px; outline:none;
+                "
+            />
+            <button onclick="sendChatMessage()" style="
+                background:none; border:1px solid #333; color:#888;
+                width:44px; height:44px; border-radius:50%;
+                font-size:18px; cursor:pointer; flex-shrink:0;
+            ">↑</button>
+        </div>
+    `
+
+    const inp = document.getElementById("chat-input")
+    if (inp) inp.onkeypress = (e) => { if (e.key === "Enter") sendChatMessage() }
+
     updateRoomHeader(room.invite_code)
-    subscribeRealtime(room.id)
-    showRoomToast(`${room.invite_code} 연결됨`)
+    loadMessages()
+    startPolling(room.id)
 }
 
-// ─── 방 나가기 ───────────────────────────────────────────────
-function leaveRoom() {
-    unsubscribeRealtime()
+// ─── 나가기 → 번역기로 복귀 ──────────────────────────────────
+function exitChatView() {
+    stopPolling()
     currentRoom = null
     clearRoomHeader()
-    showRoomToast('방에서 나왔습니다.')
-    loadRooms()
+    roomLayer.style.display = "none"  // 레이어 닫기 → 번역기 화면
+    showRoomToast('번역기로 돌아왔습니다.')
 }
 
-// ─── 방 삭제 ─────────────────────────────────────────────────
-async function deleteRoom(roomId) {
-    if (!confirm('방을 삭제하면 모든 메시지가 사라집니다. 삭제할까요?')) return
+// ─── 메시지 로드 ─────────────────────────────────────────────
+async function loadMessages() {
+    if (!currentRoom) return
     try {
-        const res = await fetch("/api/corechat?action=delete-room", {
+        const res = await fetch(`/api/corechat?action=get-messages&room_id=${currentRoom.id}`)
+        const messages = await res.json()
+        renderMessages(messages)
+    } catch(e) {
+        const el = document.getElementById("chat-messages")
+        if (el) el.innerHTML = `<div style="color:#555; font-size:12px; text-align:center; padding:20px;">메시지를 불러올 수 없습니다.</div>`
+    }
+}
+
+function renderMessages(messages) {
+    const container = document.getElementById("chat-messages")
+    if (!container) return
+    if (!messages || messages.length === 0) {
+        container.innerHTML = `<div style="color:#333; font-size:12px; text-align:center; padding:40px 0;">
+            아직 메시지가 없어요.<br><span style="color:#2a2a2a;">번역하면 자동으로 저장됩니다.</span>
+        </div>`
+        return
+    }
+
+    container.innerHTML = ""
+    messages.forEach(msg => appendMessage(msg, false))
+    container.scrollTop = container.scrollHeight
+
+    if (messages.length > 0) {
+        lastMsgTimestamp = messages[messages.length - 1].created_at
+    }
+}
+
+function appendMessage(msg, scroll = true) {
+    const container = document.getElementById("chat-messages")
+    if (!container) return
+
+    const isMe      = msg.device_id === DEVICE_ID
+    const nickname  = msg.nickname || '익명'
+    const content   = msg.translated_ko || msg.translated_vi || msg.message
+    const original  = (msg.translated_ko || msg.translated_vi) ? msg.message : null
+    const time      = new Date(msg.created_at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
+
+    const wrapper = document.createElement('div')
+    wrapper.style.cssText = `
+        display:flex;
+        flex-direction:column;
+        align-items:${isMe ? 'flex-start' : 'flex-end'};
+    `
+
+    wrapper.innerHTML = `
+        <div style="font-size:10px; color:#444; margin-bottom:4px; font-family:monospace;">
+            ${nickname}
+        </div>
+        <div style="
+            max-width:75%; padding:12px 16px;
+            background:${isMe ? '#1a1a1a' : '#111'};
+            border:1px solid ${isMe ? '#2a2a2a' : '#1e3a1e'};
+            border-radius:${isMe ? '4px 20px 20px 20px' : '20px 4px 20px 20px'};
+            color:#ddd; font-size:14px; line-height:1.6;
+        ">
+            ${content}
+            ${original ? `<div style="font-size:11px; color:#555; margin-top:6px; border-top:1px solid #2a2a2a; padding-top:6px;">${original}</div>` : ''}
+        </div>
+        <div style="font-size:10px; color:#333; margin-top:4px;">${time}</div>
+    `
+
+    container.appendChild(wrapper)
+    if (scroll) container.scrollTop = container.scrollHeight
+}
+
+// ─── 메시지 전송 ─────────────────────────────────────────────
+async function sendChatMessage() {
+    const inp = document.getElementById("chat-input")
+    if (!inp || !currentRoom) return
+    const text = inp.value.trim()
+    if (!text) return
+    inp.value = ""
+
+    const msg = {
+        room_id:   currentRoom.id,
+        nickname:  currentRoom.nickname,
+        device_id: DEVICE_ID,
+        message:   text,
+    }
+
+    // 낙관적 UI (바로 표시)
+    appendMessage({ ...msg, created_at: new Date().toISOString() })
+
+    try {
+        await fetch("/api/corechat?action=send-message", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_id: roomId, device_id: DEVICE_ID })
+            body: JSON.stringify(msg)
         })
-        const data = await res.json()
-        if (data.ok) {
-            if (currentRoom?.id === roomId) leaveRoom()
-            else loadRooms()
-            showRoomToast('방이 삭제됐습니다.')
-        } else {
-            showRoomToast('삭제 권한이 없습니다.')
+    } catch(e) { console.error('[chat] 전송 실패', e) }
+}
+
+// ─── 폴링 ────────────────────────────────────────────────────
+function startPolling(roomId) {
+    stopPolling()
+    pollingTimer = setInterval(async () => {
+        if (!currentRoom || !document.getElementById("chat-messages")) {
+            stopPolling(); return
         }
-    } catch(e) {
-        showRoomToast('삭제 실패')
-    }
+        try {
+            const url = lastMsgTimestamp
+                ? `/api/corechat?action=get-messages&room_id=${roomId}&after=${encodeURIComponent(lastMsgTimestamp)}`
+                : `/api/corechat?action=get-messages&room_id=${roomId}`
+            const res  = await fetch(url)
+            const msgs = await res.json()
+            if (!msgs || msgs.length === 0) return
+
+            // 상대방 메시지만 추가
+            const newMsgs = lastMsgTimestamp
+                ? msgs
+                : msgs.filter(m => m.device_id !== DEVICE_ID)
+
+            newMsgs.forEach(m => {
+                if (m.device_id !== DEVICE_ID) appendMessage(m)
+            })
+
+            if (msgs.length > 0) {
+                lastMsgTimestamp = msgs[msgs.length - 1].created_at
+            }
+        } catch(e) {}
+    }, 3000)
+}
+
+function stopPolling() {
+    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
 }
 
 // ─── 헤더 표시 ───────────────────────────────────────────────
@@ -373,8 +459,12 @@ function updateRoomHeader(code) {
             padding:3px 10px; border-radius:12px; cursor:pointer;
         `
         indicator.onclick = () => {
-            roomLayer.style.display = "block"
-            loadRooms()
+            if (currentRoom) {
+                showRoomListView()
+                roomLayer.style.display = "block"
+            } else {
+                toggleRooms()
+            }
         }
         roomToggle.parentNode.insertBefore(indicator, roomToggle)
     }
@@ -386,7 +476,7 @@ function clearRoomHeader() {
     if (el) el.remove()
 }
 
-// ─── 새 방 생성 ──────────────────────────────────────────────
+// ─── 방 생성 ─────────────────────────────────────────────────
 async function createNewRoom() {
     const nickname = getNickname()
     const create = async (name) => {
@@ -399,27 +489,41 @@ async function createNewRoom() {
             })
             const room = await res.json()
             if (room.id) {
-                enterRoom(room, name || nickname)
+                openChatView(room, name || nickname || '익명')
                 shareInviteCode(room.invite_code)
-                loadRooms()
             }
         } catch(e) { showRoomToast('방 생성 실패') }
     }
+    if (nickname) await create(nickname)
+    else showNicknameModal({ onConfirm: create })
+}
 
-    if (nickname) { await create(nickname) }
-    else { showNicknameModal({ onConfirm: create }) }
+// ─── 방 삭제 ─────────────────────────────────────────────────
+async function deleteRoom(roomId) {
+    if (!confirm('방을 삭제하면 모든 메시지가 사라집니다. 삭제할까요?')) return
+    try {
+        const res = await fetch("/api/corechat?action=delete-room", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, device_id: DEVICE_ID })
+        })
+        const data = await res.json()
+        if (data.ok) {
+            if (currentRoom?.id === roomId) exitChatView()
+            else showRoomListView()
+            showRoomToast('방이 삭제됐습니다.')
+        } else {
+            showRoomToast('삭제 권한이 없습니다.')
+        }
+    } catch(e) { showRoomToast('삭제 실패') }
 }
 
 // ─── 공유 ────────────────────────────────────────────────────
 function shareInviteCode(code) {
     const link      = `https://corering.vercel.app/?room=${code}`
     const shareText = `CoreRing 채팅방 초대\n👉 ${link}`
-
-    // navigator.share 지원 + HTTPS 환경에서만 사용
-    const canShare = navigator.share && 
-                     window.isSecureContext && 
-                     /android|iphone|ipad|ipod/i.test(navigator.userAgent)
-
+    const canShare  = navigator.share && window.isSecureContext &&
+                      /android|iphone|ipad|ipod/i.test(navigator.userAgent)
     if (canShare) {
         navigator.share({ title: 'CoreRing 초대', text: shareText, url: link })
             .catch(() => showShareOptions(shareText, code, link))
@@ -431,7 +535,6 @@ function shareInviteCode(code) {
 function showShareOptions(shareText, code, link) {
     const existing = document.getElementById('share-modal')
     if (existing) existing.remove()
-
     const modal = document.createElement('div')
     modal.id = 'share-modal'
     modal.style.cssText = `
@@ -440,126 +543,36 @@ function showShareOptions(shareText, code, link) {
         z-index:300; padding:20px;
     `
     modal.innerHTML = `
-        <div style="
-            background:#111; border:1px solid #2a2a2a;
-            border-radius:24px; padding:24px;
-            width:100%; max-width:400px; margin-bottom:20px;
-        ">
+        <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px; padding:24px;
+            width:100%; max-width:400px; margin-bottom:20px;">
             <div style="font-size:11px; letter-spacing:3px; color:#555; margin-bottom:16px;">초대 코드</div>
-            <div style="
-                font-size:28px; font-family:monospace; letter-spacing:6px;
-                color:#fff; text-align:center;
-                background:#0a0a0a; border-radius:16px; padding:20px;
-                margin-bottom:20px;
-            ">${code}</div>
-
+            <div style="font-size:28px; font-family:monospace; letter-spacing:6px; color:#fff;
+                text-align:center; background:#0a0a0a; border-radius:16px; padding:20px; margin-bottom:20px;">
+                ${code}
+            </div>
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}"
-                   target="_blank" style="
-                    display:block; text-align:center;
-                    background:#25D366; color:#fff;
-                    padding:14px; border-radius:16px;
-                    font-size:14px; text-decoration:none; font-weight:600;
-                ">WhatsApp으로 공유</a>
-
+                   target="_blank" style="display:block; text-align:center; background:#25D366;
+                   color:#fff; padding:14px; border-radius:16px; font-size:14px;
+                   text-decoration:none; font-weight:600;">WhatsApp으로 공유</a>
                 <a href="https://zalo.me/share?text=${encodeURIComponent(shareText)}"
-                   target="_blank" style="
-                    display:block; text-align:center;
-                    background:#0068FF; color:#fff;
-                    padding:14px; border-radius:16px;
-                    font-size:14px; text-decoration:none; font-weight:600;
-                ">잘로(Zalo)로 공유</a>
-
-                <button onclick="
-                    navigator.clipboard.writeText('${shareText.replace(/'/g, "\\'")}')
-                    .then(()=>{ document.getElementById('share-modal').remove(); showRoomToast('📋 링크 복사됨!') })
-                " style="
+                   target="_blank" style="display:block; text-align:center; background:#0068FF;
+                   color:#fff; padding:14px; border-radius:16px; font-size:14px;
+                   text-decoration:none; font-weight:600;">잘로(Zalo)로 공유</a>
+                <button onclick="navigator.clipboard.writeText('${link}').then(()=>{document.getElementById('share-modal').remove();showRoomToast('📋 링크 복사됨!')})" style="
                     background:#1a1a1a; border:1px solid #333; color:#aaa;
-                    padding:14px; border-radius:16px;
-                    font-size:14px; cursor:pointer;
-                ">링크 복사</button>
+                    padding:14px; border-radius:16px; font-size:14px; cursor:pointer;">링크 복사</button>
             </div>
-
             <button onclick="document.getElementById('share-modal').remove()" style="
-                width:100%; margin-top:12px;
-                background:none; border:1px solid #2a2a2a; color:#555;
-                padding:12px; border-radius:16px;
-                font-size:13px; cursor:pointer;
-            ">닫기</button>
+                width:100%; margin-top:12px; background:none; border:1px solid #2a2a2a; color:#555;
+                padding:12px; border-radius:16px; font-size:13px; cursor:pointer;">닫기</button>
         </div>
     `
     document.body.appendChild(modal)
     modal.onclick = (e) => { if (e.target === modal) modal.remove() }
 }
 
-// ─── Supabase Realtime 구독 ──────────────────────────────────
-function subscribeRealtime(roomId) {
-    unsubscribeRealtime()
-
-    // Supabase Realtime은 API에서 처리 → 폴링으로 대체 (Phase 0)
-    realtimeChannel = setInterval(async () => {
-        if (!currentRoom) return
-        try {
-            const res = await fetch(`/api/corechat?action=get-messages&room_id=${roomId}`)
-            const messages = await res.json()
-            showIncomingMessages(messages)
-        } catch(e) {}
-    }, 3000)
-}
-
-function unsubscribeRealtime() {
-    if (realtimeChannel) { clearInterval(realtimeChannel); realtimeChannel = null }
-}
-
-// ─── 수신 메시지 표시 ────────────────────────────────────────
-let lastMessageCount = 0
-
-function showIncomingMessages(messages) {
-    if (!messages || messages.length === 0) return
-    if (messages.length <= lastMessageCount) return
-
-    // 새 메시지만
-    const newMessages = messages.slice(lastMessageCount)
-    lastMessageCount  = messages.length
-
-    newMessages.forEach(msg => {
-        const isMe = msg.device_id === DEVICE_ID
-        if (isMe) return  // 내 메시지는 이미 표시됨
-
-        // 상대방 메시지 → 번역기 화면에 토스트로 표시
-        showMessageToast(msg)
-    })
-}
-
-function showMessageToast(msg) {
-    const existing = document.getElementById('msg-toast')
-    if (existing) existing.remove()
-
-    const nickname = msg.nickname || '상대방'
-    const content  = msg.translated_ko || msg.translated_vi || msg.message
-
-    const toast = document.createElement('div')
-    toast.id = 'msg-toast'
-    toast.style.cssText = `
-        position:fixed; top:70px; left:50%;
-        transform:translateX(-50%);
-        background:#111; border:1px solid #2a2a2a;
-        border-radius:16px; padding:12px 18px;
-        max-width:80%; z-index:100;
-        cursor:pointer;
-    `
-    toast.innerHTML = `
-        <div style="font-size:10px; color:#555; font-family:monospace; margin-bottom:4px;">
-            ${nickname}
-        </div>
-        <div style="font-size:14px; color:#ddd;">${content}</div>
-    `
-    toast.onclick = () => toast.remove()
-    document.body.appendChild(toast)
-    setTimeout(() => { if (toast.parentNode) toast.remove() }, 4000)
-}
-
-// ─── 번역 결과 채팅방 저장 (engine.js에서 호출) ──────────────
+// ─── 번역 결과 자동 저장 (engine.js에서 호출) ────────────────
 async function sendTranslationToRoom(original, translated, direction) {
     if (!currentRoom) return
     try {
@@ -568,7 +581,6 @@ async function sendTranslationToRoom(original, translated, direction) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 room_id:       currentRoom.id,
-                sender_id:     null,
                 nickname:      currentRoom.nickname,
                 device_id:     DEVICE_ID,
                 message:       original,
@@ -576,9 +588,47 @@ async function sendTranslationToRoom(original, translated, direction) {
                 translated_vi: direction === 'KO→VI' ? translated : null,
             })
         })
-    } catch(e) {
-        console.error('[rooms] 번역 저장 실패', e)
+    } catch(e) { console.error('[rooms] 번역 저장 실패', e) }
+}
+
+// ─── 닉네임 모달 ─────────────────────────────────────────────
+function showNicknameModal({ onConfirm }) {
+    const existing = document.getElementById('nickname-modal')
+    if (existing) existing.remove()
+    const overlay = document.createElement('div')
+    overlay.id = 'nickname-modal'
+    overlay.style.cssText = `
+        position:fixed; inset:0; background:rgba(0,0,0,0.85);
+        display:flex; align-items:center; justify-content:center;
+        z-index:200; padding:20px;
+    `
+    overlay.innerHTML = `
+        <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px;
+            padding:32px 24px; width:100%; max-width:320px;">
+            <div style="font-size:11px; letter-spacing:3px; color:#555; margin-bottom:16px;">NICKNAME</div>
+            <div style="font-size:18px; font-weight:700; color:#fff; margin-bottom:24px;">채팅에서 사용할 이름</div>
+            <input id="nickname-input" type="text" maxlength="20" placeholder="상요이"
+                style="width:100%; background:#0a0a0a; border:1px solid #333; border-radius:12px;
+                padding:14px 16px; color:#fff; font-size:16px; outline:none;
+                box-sizing:border-box; margin-bottom:16px;"
+            />
+            <button id="nickname-confirm" style="width:100%; background:#fff; border:none;
+                border-radius:16px; padding:16px; color:#000; font-size:16px;
+                font-weight:800; cursor:pointer;">입장</button>
+        </div>
+    `
+    document.body.appendChild(overlay)
+    const inp = document.getElementById('nickname-input')
+    const btn = document.getElementById('nickname-confirm')
+    inp.focus()
+    const confirm = () => {
+        const name = inp.value.trim()
+        if (!name) { inp.style.borderColor = '#a55'; return }
+        overlay.remove()
+        onConfirm(name)
     }
+    btn.onclick    = confirm
+    inp.onkeypress = (e) => { if (e.key === 'Enter') confirm() }
 }
 
 // ─── 토스트 ──────────────────────────────────────────────────
@@ -589,13 +639,10 @@ function showRoomToast(msg) {
     toast.id = 'room-toast'
     toast.textContent = msg
     toast.style.cssText = `
-        position:fixed; bottom:100px; left:50%;
-        transform:translateX(-50%);
-        background:#1a1a1a; color:#aaa;
-        border:1px solid #2a2a2a;
-        padding:10px 20px; border-radius:20px;
-        font-size:12px; font-family:monospace;
-        z-index:9999; white-space:nowrap; letter-spacing:1px;
+        position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+        background:#1a1a1a; color:#aaa; border:1px solid #2a2a2a;
+        padding:10px 20px; border-radius:20px; font-size:12px;
+        font-family:monospace; z-index:9999; white-space:nowrap; letter-spacing:1px;
     `
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
