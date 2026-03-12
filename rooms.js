@@ -362,8 +362,11 @@ function appendMessage(msg, scroll = true) {
     const time      = new Date(msg.created_at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})
 
     // 중복 방지: data-msg-id로 이미 있으면 skip
-    if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return
-
+    if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return    if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) {
+        console.log('[중복스킵]', msg.id)  // ← 추가
+        return
+    }
+    console.log('[추가]', msg.id, msg.message)  // ← 추가
     const wrapper = document.createElement('div')
     wrapper.style.cssText = `
         display:flex;
