@@ -37,9 +37,9 @@ export default async function handler(req, res) {
 // body: { device_id, room_type? }
 // ============================================================
 async function createRoom(req, res) {
-  const { device_id, room_type = "dm" } = req.body
-
-  if (!device_id) return res.status(400).json({ error: "device_id required" })
+    const { device_id, room_type = "dm" } = req.body
+    console.log("[createRoom] body:", req.body)  // ← 추가
+    if (!device_id) return res.status(400).json({ error: "device_id required" })
 
   const invite_code = Math.random().toString(36).slice(2, 8).toUpperCase()
 
