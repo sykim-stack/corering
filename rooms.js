@@ -16,6 +16,7 @@ let rooms            = []
 let currentRoom      = null
 let pollingTimer     = null
 let lastMsgTimestamp = null
+const sentMsgIds     = new Set()  // 내가 보낸 메시지 ID 추적
 
 // ─── device_id / nickname ────────────────────────────────────
 function getDeviceId() {
@@ -413,18 +414,19 @@ async function sendChatMessage() {
     appendMessage({ ...msg, id: tempId, created_at: new Date().toISOString() })
 
     try {
-        await fetch("/api/corechat?action=send-message", {
+        const res  = await fetch("/api/corechat?action=send-message", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(msg)
         })
+        const data = await res.json()
+        if (data?.[0]?.id) sentMsgIds.add(data[0].id)
     } catch(e) { console.error('[chat] 전송 실패', e) }
 }
 
 // ─── 폴링 ────────────────────────────────────────────────────
 function startPolling(roomId) {
     stopPolling()
-    // 폴링 시작 시각 기록 → 이후 새 메시지만 수신
     if (!lastMsgTimestamp) {
         lastMsgTimestamp = new Date().toISOString()
     }
@@ -437,9 +439,9 @@ function startPolling(roomId) {
             const res  = await fetch(url)
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
-            msgs.forEach(m => {
-                if (m.device_id !== DEVICE_ID) appendMessage(m)
-            })
+            // 내 device_id 또는 이미 표시된 id 제외
+            msgs.filter(m => m.device_id !== DEVICE_ID && !sentMsgIds.has(m.id))
+                .forEach(m => appendMessage(m))
             lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
     }, 3000)
@@ -581,7 +583,7 @@ async function sendTranslationToRoom(original, translated, direction) {
     if (!original || !translated) return
     const isKoResult = direction === 'VI→KO'
     try {
-        await fetch("/api/corechat?action=send-message", {
+        const tres = await fetch("/api/corechat?action=send-message", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -593,17 +595,20 @@ async function sendTranslationToRoom(original, translated, direction) {
                 translated_vi: !isKoResult ? translated : null,
             })
         })
-        // 번역 결과 채팅창에 바로 표시
-        const msg = {
-            id:            'trans_' + Date.now(),
-            device_id:     DEVICE_ID,
-            nickname:      currentRoom.nickname,
-            message:       original,
-            translated_ko: isKoResult ? translated : null,
-            translated_vi: !isKoResult ? translated : null,
-            created_at:    new Date().toISOString()
+        const tdata = await tres.json()
+        if (tdata?.[0]?.id) sentMsgIds.add(tdata[0].id)
+        // 번역 결과 채팅창에 직접 표시 (내 것)
+        if (document.getElementById('chat-messages')) {
+            appendMessage({
+                id: tdata?.[0]?.id || 'trans_' + Date.now(),
+                device_id: DEVICE_ID,
+                nickname: currentRoom.nickname,
+                message: original,
+                translated_ko: isKoResult ? translated : null,
+                translated_vi: !isKoResult ? translated : null,
+                created_at: new Date().toISOString()
+            })
         }
-        if (document.getElementById('chat-messages')) appendMessage(msg)
     } catch(e) { console.error('[rooms] 번역 저장 실패', e) }
 }
 
