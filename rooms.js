@@ -398,7 +398,9 @@ async function sendChatMessage() {
     const inp = document.getElementById("chat-input")
     if (!inp || !currentRoom) return
     const text = inp.value.trim()
+    console.log("[chat] currentRoom:", currentRoom)  // ← 추가
     if (!text) return
+    console.log("[chat] sending:", text, currentRoom)  // ← 추가
     inp.value = ""
 
     const msg = {
