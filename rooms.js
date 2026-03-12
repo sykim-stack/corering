@@ -442,7 +442,7 @@ function startPolling(roomId) {
             msgs.forEach(m => {
                 if (m.device_id !== DEVICE_ID) appendMessage(m)
             })
-            lastMsgTimestamp = msgs[msgs.length - 1].created_at
+            lastMsgTimestamp = new Date(msgs[msgs.length - 1].created_at).toISOString()
         } catch(e) {}
     }, 3000)
 }
