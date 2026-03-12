@@ -38,18 +38,20 @@ export default async function handler(req, res) {
 // ============================================================
 async function createRoom(req, res) {
     const { device_id, room_type = "dm" } = req.body
-    console.log("[createRoom] body:", req.body)  // ← 추가
-    if (!device_id) return res.status(400).json({ error: "device_id required" })
-
-  const invite_code = Math.random().toString(36).slice(2, 8).toUpperCase()
-
-  const { data: room, error } = await supabase
-    .from("rooms")
-    .insert({ invite_code, owner_id: device_id, room_type })
-    .select()
-    .single()
-
-  if (error) return res.status(500).json({ error })
+    console.log("[createRoom] body:", req.body)
+  
+    const invite_code = Math.random().toString(36).slice(2, 8).toUpperCase()
+  
+    const { data: room, error } = await supabase
+      .from("rooms")
+      .insert({ invite_code, owner_device_id: device_id, room_type })
+      .select()
+      .single()
+  
+    console.log("[createRoom] room:", room)
+    console.log("[createRoom] error:", error)  // ← 이거 추가
+  
+    if (error) return res.status(500).json({ error })
 
   // 방장 자동 등록
   await supabase
