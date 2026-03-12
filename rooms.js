@@ -408,7 +408,9 @@ async function sendChatMessage() {
         message:   text,
     }
 
-    // ← 낙관적 UI 블록 전체 제거 (tempId 부분)
+    // 낙관적 UI (바로 표시) - 임시 id로 중복 방지
+    const tempId = 'temp_' + Date.now()
+    appendMessage({ ...msg, id: tempId, created_at: new Date().toISOString() })
 
     try {
         await fetch("/api/corechat?action=send-message", {
@@ -436,7 +438,7 @@ function startPolling(roomId) {
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
             msgs.forEach(m => {
-                appendMessage(m)  // device_id 체크 제거
+                if (m.device_id !== DEVICE_ID) appendMessage(m)
             })
             lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
@@ -575,8 +577,9 @@ function showShareOptions(shareText, code, link) {
 
 // ─── 번역 결과 자동 저장 (engine.js에서 호출) ────────────────
 async function sendTranslationToRoom(original, translated, direction) {
-    console.log('[rooms] sendTranslationToRoom 호출', currentRoom?.id)  // ← 추가
     if (!currentRoom) return
+    if (!original || !translated) return
+    const isKoResult = direction === 'VI→KO'
     try {
         await fetch("/api/corechat?action=send-message", {
             method: "POST",
@@ -586,11 +589,21 @@ async function sendTranslationToRoom(original, translated, direction) {
                 nickname:      currentRoom.nickname,
                 device_id:     DEVICE_ID,
                 message:       original,
-                translated_ko: direction === 'VI→KO' ? translated : null,
-                translated_vi: direction === 'KO→VI' ? translated : null,
+                translated_ko: isKoResult ? translated : null,
+                translated_vi: !isKoResult ? translated : null,
             })
         })
-        console.log('[rooms] 번역저장 응답', await res.json())  // ← 추가
+        // 번역 결과 채팅창에 바로 표시
+        const msg = {
+            id:            'trans_' + Date.now(),
+            device_id:     DEVICE_ID,
+            nickname:      currentRoom.nickname,
+            message:       original,
+            translated_ko: isKoResult ? translated : null,
+            translated_vi: !isKoResult ? translated : null,
+            created_at:    new Date().toISOString()
+        }
+        if (document.getElementById('chat-messages')) appendMessage(msg)
     } catch(e) { console.error('[rooms] 번역 저장 실패', e) }
 }
 
