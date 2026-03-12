@@ -136,9 +136,9 @@ async function initEngine() {
     if (engineInitialized) return;
     engineInitialized = true;
     try {
-        const res             = await fetch('/api/get-sheet-dictionary');
+        const res             = await fetch('/api/corering?action=get-dictionary');
         CORE_DICTIONARY       = await res.json();
-        const conflictRes     = await fetch('/api/get-conflicts');
+        const conflictRes     = await fetch('/api/corering?action=get-conflicts');
         CONFLICT_DICTIONARY   = await conflictRes.json();
         buildDictionaryIndex();
     } catch (e) {
@@ -155,6 +155,15 @@ async function sendMessage(text){
         alert("ROOM 먼저 선택")
         return
     }
+
+    await fetch("/api/send_message",{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            room_id:currentRoom,
+            message:text
+        })
+    })
 
 }
 
@@ -328,7 +337,7 @@ function buildIntentBadge(intent) {
 // ─── CHAT 모드 처리 ───────────────────────────────────────────
 async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
     try {
-        const res = await fetch('/api/chat', {
+        const res = await fetch('/api/corechat?action=chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -379,7 +388,6 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
 
         try { await navigator.clipboard.writeText(translated); } catch {}
-        if (typeof sendTranslationToRoom === 'function') sendTranslationToRoom(text, translated, isKorean ? 'KO→VI' : 'VI→KO');
 
         saveChatLog({
             original:   text,
@@ -395,7 +403,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
 
         sessionLogs.push({ input: text, output: translated, rawScore: calcEmotionScore(text), timestamp: Date.now() });
 
-        fetch('/api/corechat-log', {
+        fetch('/api/corechat?action=log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -462,9 +470,10 @@ async function handleSend() {
     // ── RING 모드 (DeepL) ──
     try {
         const target         = isKorean ? 'VI' : 'KO';
-        const res            = await fetch(`/api/corering?text=${encodeURIComponent(text)}&target=${target}`);
+        const res            = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
         const data           = await res.json();
         const rawTranslation = data.translations[0].text;
+        if (typeof sendTranslationToRoom === 'function') sendTranslationToRoom(text, rawTranslation, isKorean ? 'KO→VI' : 'VI→KO');
 
         const checkText       = isKorean ? rawTranslation : text;
         const detectedDialect = detectDialectScore(checkText);
@@ -525,8 +534,6 @@ async function handleSend() {
         });
 
         autoSaveToDataset({ inputText: text, outputText: rawTranslation, isKorean });
-        console.log('[번역저장]', typeof sendTranslationToRoom, currentRoom)
-        if (typeof sendTranslationToRoom === 'function') sendTranslationToRoom(text, rawTranslation, isKorean ? 'KO→VI' : 'VI→KO');
 
         // ── v3.6: intent 전달 ──
         await saveTranslationLog({
@@ -681,4 +688,3 @@ document.addEventListener('click', (e) => {
         });
     }
 });
-
