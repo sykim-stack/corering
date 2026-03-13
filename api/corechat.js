@@ -1,15 +1,5 @@
 // ============================================================
-// BRAINPOOL | CoreChat — 통합 API v1.0
-// 라우팅: /api/corechat?action=xxx
-//
-// action 목록:
-//   chat             ← chat.js
-//   log              ← corechat-log.js
-//   create-room      ← create_room.js
-//   get-messages     ← get_messages.js
-//   send-message     ← send_message.js
-//   join-room        ← join-room.js
-//   create-space     ← create_space.js
+// BRAINPOOL | CoreChat — 통합 API v2.0
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -151,95 +141,126 @@ async function handleLog(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// CREATE ROOM
+// CREATE ROOM (연쇄 동작: CoreID → 방 → 집)
 // ─────────────────────────────────────────────
 async function handleCreateRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
-  
+
     const { device_id, room_type = 'dm' } = req.body;
     if (!device_id) return res.status(400).json({ error: 'device_id 필수' });
-  
+
     try {
-      // Step 1: CoreID 확정
-      let coreUser;
-      const { data: existing } = await supabaseService
-        .schema('corechat')
-        .from('core_users')
-        .select('*')
-        .eq('device_id', device_id)
-        .single();
-  
-      if (existing) {
-        coreUser = existing;
-      } else {
-        const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
-        const { data: newUser, error: userErr } = await supabaseService
-          .schema('corechat')
-          .from('core_users')
-          .insert({ core_id: coreId, device_id })
-          .select()
-          .single();
-        if (userErr) throw userErr;
-        coreUser = newUser;
-      }
-  
-      // Step 2: CoreChat 방 생성
-      const { data: room, error: roomErr } = await supabaseService
-        .from('chat_rooms')
-        .insert({
-          room_type,
-          owner_device_id: device_id,
-          core_user_id: coreUser.id,
-          is_permanent: true,
-        })
-        .select()
-        .single();
-      if (roomErr) throw roomErr;
-  
-      // Step 3: CoreNull 집 자동 생성
-      const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-      const { data: house, error: houseErr } = await supabaseService
-        .schema('corenull')
-        .from('houses')
-        .insert({
-          slug,
-          core_user_id: coreUser.id,
-          category: 'daily',
-          house_type: 'personal',
-          name: slug,
-        })
-        .select()
-        .single();
-      if (houseErr) throw houseErr;
-  
-      // Step 4: space_id 연결
-      await supabaseService
-        .from('chat_rooms')
-        .update({ space_id: house.id })
-        .eq('id', room.id);
-  
-      return res.json({
-        room:      { ...room, space_id: house.id },
-        core_user: coreUser,
-        house:     { id: house.id, slug: house.slug },
-      });
-  
+        // Step 1: CoreID 확정 (없으면 신규 발급)
+        let coreUser;
+        const { data: existing } = await supabaseService
+            .schema('corechat')
+            .from('core_users')
+            .select('*')
+            .eq('device_id', device_id)
+            .single();
+
+        if (existing) {
+            coreUser = existing;
+        } else {
+            const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
+            const { data: newUser, error: userErr } = await supabaseService
+                .schema('corechat')
+                .from('core_users')
+                .insert({ core_id: coreId, device_id })
+                .select()
+                .single();
+            if (userErr) throw userErr;
+            coreUser = newUser;
+        }
+
+        // Step 2: CoreChat 방 생성
+        const { data: room, error: roomErr } = await supabaseService
+            .from('chat_rooms')
+            .insert({
+                room_type,
+                owner_device_id: device_id,
+                core_user_id: coreUser.id,
+                is_permanent: true,
+            })
+            .select()
+            .single();
+        if (roomErr) throw roomErr;
+
+        // Step 3: CoreNull 집 자동 생성
+        const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
+        const { data: house, error: houseErr } = await supabaseService
+            .schema('corenull')
+            .from('houses')
+            .insert({
+                slug,
+                core_user_id: coreUser.id,
+                category: 'daily',
+                house_type: 'personal',
+                name: slug,
+            })
+            .select()
+            .single();
+        if (houseErr) throw houseErr;
+
+        // Step 4: space_id 연결
+        await supabaseService
+            .from('chat_rooms')
+            .update({ space_id: house.id })
+            .eq('id', room.id);
+
+        return res.json({
+            room:      { ...room, space_id: house.id },
+            core_user: coreUser,
+            house:     { id: house.id, slug: house.slug },
+        });
+
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+        return res.status(500).json({ error: e.message });
     }
-  }
+}
+
+// ─────────────────────────────────────────────
+// DELETE ROOM
+// ─────────────────────────────────────────────
+async function handleDeleteRoom(req, res) {
+    if (req.method !== 'POST') return res.status(405).end();
+
+    const { room_id, device_id } = req.body;
+    if (!room_id || !device_id) return res.status(400).json({ error: 'room_id, device_id 필수' });
+
+    const { data: room, error: findErr } = await supabaseService
+        .from('chat_rooms')
+        .select('owner_device_id')
+        .eq('id', room_id)
+        .single();
+
+    if (findErr) return res.status(404).json({ error: '방을 찾을 수 없습니다.' });
+    if (room.owner_device_id !== device_id) return res.status(403).json({ ok: false, error: '권한 없음' });
+
+    const { error } = await supabaseService
+        .from('chat_rooms')
+        .delete()
+        .eq('id', room_id);
+
+    if (error) return res.status(500).json(error);
+    return res.json({ ok: true });
+}
 
 // ─────────────────────────────────────────────
 // GET MESSAGES
 // ─────────────────────────────────────────────
 async function handleGetMessages(req, res) {
     const { room_id, after } = req.query;
+    if (!room_id) return res.status(400).json({ error: 'room_id 필수' });
+
     let query = supabaseAnon
         .from('chat_messages')
         .select('*')
         .eq('room_id', room_id)
         .order('created_at', { ascending: true });
+
     if (after) query = query.gt('created_at', after);
+
     const { data, error } = await query;
     if (error) return res.status(500).json(error);
     return res.json(data);
@@ -251,11 +272,12 @@ async function handleGetMessages(req, res) {
 async function handleSendMessage(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { room_id, sender_id, message } = req.body;
+    const { room_id, nickname, device_id, message, translated_ko = null, translated_vi = null } = req.body;
+    if (!room_id || !message) return res.status(400).json({ error: 'room_id, message 필수' });
 
     const { data, error } = await supabaseService
         .from('chat_messages')
-        .insert({ room_id, sender_id, message })
+        .insert({ room_id, nickname, device_id, message, translated_ko, translated_vi })
         .select();
 
     if (error) return res.status(500).json(error);
@@ -267,17 +289,22 @@ async function handleSendMessage(req, res) {
 // ─────────────────────────────────────────────
 async function handleJoinRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
+
     const { invite_code, nickname = null, device_id = null } = req.body;
+    if (!invite_code) return res.status(400).json({ error: 'invite_code 필수' });
+
     const { data: room, error } = await supabaseService
         .from('chat_rooms')
         .select('*')
         .eq('invite_code', invite_code.toUpperCase())
         .single();
+
     if (error) return res.status(404).json({ error: '존재하지 않는 초대 코드입니다.' });
-    // participants 기록
-    await supabaseService.from('chat_participants')
-        .insert({ room_id: room.id, nickname, device_id })
-        .select();
+
+    await supabaseService
+        .from('chat_participants')
+        .insert({ room_id: room.id, nickname, device_id });
+
     return res.json(room);
 }
 
@@ -301,6 +328,7 @@ async function handleCreateSpace(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const { room_id, space_type } = req.body;
+    if (!room_id || !space_type) return res.status(400).json({ error: 'room_id, space_type 필수' });
 
     const { data, error } = await supabaseService
         .from('spaces')
@@ -334,6 +362,6 @@ export default async function handler(req, res) {
         case 'join-room':     return handleJoinRoom(req, res);
         case 'create-space':  return handleCreateSpace(req, res);
         default:
-            return res.status(400).json({ error: 'action 파라미터 필요 (chat | log | create-room | get-messages | send-message | join-room | create-space)' });
+            return res.status(400).json({ error: 'action 파라미터 필요' });
     }
 }
