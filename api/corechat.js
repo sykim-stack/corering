@@ -1,5 +1,5 @@
 // ============================================================
-// BRAINPOOL | CoreChat — 통합 API v2.0
+// BRAINPOOL | CoreChat — 통합 API v2.1
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
@@ -14,13 +14,34 @@ const supabaseAnon = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
+// corechat 스키마 직접 fetch 헬퍼
+async function corechatFetch(path, method = 'GET', body = null) {
+    const url = `${process.env.SUPABASE_URL}/rest/v1/${path}`;
+    const headers = {
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept-Profile': 'corechat',
+        'Content-Profile': 'corechat',
+        'Prefer': 'return=representation',
+    };
+    const res = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : null,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(JSON.stringify(data));
+    return data;
+}
+
 // ─────────────────────────────────────────────
 // CHAT (Gemini 번역)
 // ─────────────────────────────────────────────
 async function handleChat(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { text, history = [], softTone = false, role = 'unknown', dialect = 'vi_south' } = req.body;
+    const { text, history = [], softTone = false, dialect = 'vi_south' } = req.body;
     if (!text) return res.status(400).json({ error: 'text is required' });
 
     const dialectGuide =
@@ -31,7 +52,6 @@ async function handleChat(req, res) {
     const SYSTEM_PROMPT = `
 당신은 한국-베트남 부부 통역사입니다.
 ${dialectGuide}
-
 규칙:
 1. 번역 결과만 출력. 설명 절대 금지.
 2. 괄호, 태그, 안내문구 절대 금지.
@@ -55,10 +75,7 @@ ${dialectGuide}
         ? `\n[이전 대화 맥락]\n${contextText}\n위 맥락을 참고해서 번역하세요.`
         : '';
 
-    const fullPrompt = `${SYSTEM_PROMPT}${toneGuide}${contextGuide}
-
-다음 문장을 ${targetLang}로 번역하세요:
-"${text}"`;
+    const fullPrompt = `${SYSTEM_PROMPT}${toneGuide}${contextGuide}\n\n다음 문장을 ${targetLang}로 번역하세요:\n"${text}"`;
 
     try {
         const geminiRes = await fetch(
@@ -75,16 +92,13 @@ ${dialectGuide}
                 }),
             }
         );
-
         if (!geminiRes.ok) {
             const err = await geminiRes.json();
             throw new Error(err.error?.message || 'Gemini API 오류');
         }
-
         const geminiData = await geminiRes.json();
         const translated = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!translated) throw new Error('번역 결과 없음');
-
         return res.status(200).json({ translated, direction, softTone });
     } catch (e) {
         return res.status(500).json({ error: e.message });
@@ -96,43 +110,36 @@ ${dialectGuide}
 // ─────────────────────────────────────────────
 async function handleLog(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
-
     try {
         const {
             user_id, source_locale, target_locale,
             input_text, output_text, engine_used,
             emotion_score, conflict_detected
         } = req.body;
-
         if (!input_text || !output_text || !engine_used)
             return res.status(400).json({ error: 'input_text, output_text, engine_used 필수' });
-
         const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/translation_logs`,
+            `${process.env.SUPABASE_URL}/rest/v1/translation_logs`,
             {
                 method: 'POST',
                 headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'apikey': process.env.SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
                     'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
+                    'Prefer': 'return=minimal',
+                    'Accept-Profile': 'corechat',
+                    'Content-Profile': 'corechat',
                 },
                 body: JSON.stringify({
-                    user_id:           user_id || null,
-                    source_locale:     source_locale || null,
-                    target_locale:     target_locale || null,
-                    input_text,
-                    output_text,
-                    engine_used,
-                    emotion_score:     emotion_score ?? null,
+                    user_id: user_id || null,
+                    source_locale: source_locale || null,
+                    target_locale: target_locale || null,
+                    input_text, output_text, engine_used,
+                    emotion_score: emotion_score ?? null,
                     conflict_detected: conflict_detected ?? false
                 })
             }
         );
-
         if (!response.ok) throw new Error(await response.text());
         return res.status(200).json({ ok: true });
     } catch (e) {
@@ -141,7 +148,7 @@ async function handleLog(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// CREATE ROOM (연쇄 동작: CoreID → 방 → 집)
+// CREATE ROOM (연쇄: CoreID → 방 → 집)
 // ─────────────────────────────────────────────
 async function handleCreateRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
@@ -150,27 +157,17 @@ async function handleCreateRoom(req, res) {
     if (!device_id) return res.status(400).json({ error: 'device_id 필수' });
 
     try {
-        // Step 1: CoreID 확정 (없으면 신규 발급)
+        // Step 1: CoreID 확정
         let coreUser;
-        const { data: existing } = await supabaseService
-            .schema('corechat')
-            .from('core_users')
-            .select('*')
-            .eq('device_id', device_id)
-            .single();
-
-        if (existing) {
-            coreUser = existing;
+        const existingList = await corechatFetch(
+            `core_users?device_id=eq.${encodeURIComponent(device_id)}&limit=1`
+        );
+        if (existingList.length > 0) {
+            coreUser = existingList[0];
         } else {
             const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
-            const { data: newUser, error: userErr } = await supabaseService
-                .schema('corechat')
-                .from('core_users')
-                .insert({ core_id: coreId, device_id })
-                .select()
-                .single();
-            if (userErr) throw userErr;
-            coreUser = newUser;
+            const created = await corechatFetch('core_users', 'POST', { core_id: coreId, device_id });
+            coreUser = Array.isArray(created) ? created[0] : created;
         }
 
         // Step 2: CoreChat 방 생성
@@ -184,7 +181,7 @@ async function handleCreateRoom(req, res) {
             })
             .select()
             .single();
-        if (roomErr) throw roomErr;
+        if (roomErr) throw new Error(roomErr.message);
 
         // Step 3: CoreNull 집 자동 생성
         const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
@@ -200,7 +197,7 @@ async function handleCreateRoom(req, res) {
             })
             .select()
             .single();
-        if (houseErr) throw houseErr;
+        if (houseErr) throw new Error(houseErr.message);
 
         // Step 4: space_id 연결
         await supabaseService
