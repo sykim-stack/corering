@@ -154,28 +154,80 @@ async function handleLog(req, res) {
 // CREATE ROOM
 // ─────────────────────────────────────────────
 async function handleCreateRoom(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { user_id, room_type = 'dm', device_id = null } = req.body;
-    const { data: room, error } = await supabaseService
+    if (req.method !== 'POST') return res.status(405).end();
+  
+    const { device_id, room_type = 'dm' } = req.body;
+    if (!device_id) return res.status(400).json({ error: 'device_id 필수' });
+  
+    try {
+      // Step 1: CoreID 확정
+      let coreUser;
+      const { data: existing } = await supabaseService
+        .schema('corechat')
+        .from('core_users')
+        .select('*')
+        .eq('device_id', device_id)
+        .single();
+  
+      if (existing) {
+        coreUser = existing;
+      } else {
+        const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const { data: newUser, error: userErr } = await supabaseService
+          .schema('corechat')
+          .from('core_users')
+          .insert({ core_id: coreId, device_id })
+          .select()
+          .single();
+        if (userErr) throw userErr;
+        coreUser = newUser;
+      }
+  
+      // Step 2: CoreChat 방 생성
+      const { data: room, error: roomErr } = await supabaseService
         .from('chat_rooms')
-        .insert({ room_type, created_by: user_id || null, owner_device_id: device_id })
+        .insert({
+          room_type,
+          owner_device_id: device_id,
+          core_user_id: coreUser.id,
+          is_permanent: true,
+        })
         .select()
         .single();
-    if (error) return res.status(500).json(error);
-    return res.json(room);
-}
-
-async function handleDeleteRoom(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { room_id, device_id } = req.body;
-    const { data: room, error: findErr } = await supabaseService
-        .from('chat_rooms').select('owner_device_id').eq('id', room_id).single();
-    if (findErr) return res.status(404).json({ error: '방을 찾을 수 없습니다.' });
-    if (room.owner_device_id !== device_id) return res.status(403).json({ ok: false, error: '권한 없음' });
-    const { error } = await supabaseService.from('chat_rooms').delete().eq('id', room_id);
-    if (error) return res.status(500).json(error);
-    return res.json({ ok: true });
-}
+      if (roomErr) throw roomErr;
+  
+      // Step 3: CoreNull 집 자동 생성
+      const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
+      const { data: house, error: houseErr } = await supabaseService
+        .schema('corenull')
+        .from('houses')
+        .insert({
+          slug,
+          core_user_id: coreUser.id,
+          category: 'daily',
+          house_type: 'personal',
+          name: slug,
+        })
+        .select()
+        .single();
+      if (houseErr) throw houseErr;
+  
+      // Step 4: space_id 연결
+      await supabaseService
+        .from('chat_rooms')
+        .update({ space_id: house.id })
+        .eq('id', room.id);
+  
+      return res.json({
+        room:      { ...room, space_id: house.id },
+        core_user: coreUser,
+        house:     { id: house.id, slug: house.slug },
+      });
+  
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
 // ─────────────────────────────────────────────
 // GET MESSAGES
