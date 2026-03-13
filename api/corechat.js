@@ -21,8 +21,6 @@ async function corechatFetch(path, method = 'GET', body = null) {
         'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         'Content-Type': 'application/json',
-        'Accept-Profile': 'corechat',
-        'Content-Profile': 'corechat',
         'Prefer': 'return=representation',
     };
     const res = await fetch(url, {
