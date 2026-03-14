@@ -508,7 +508,7 @@ async function createNewRoom() {
             if (room?.id) {
                 openChatView(room, name || nickname || '익명')
                 shareInviteCode(room.invite_code)
-                await loadRooms()
+                await showRoomListView()
             } else {
                 console.error('room.id 없음:', data)
                 showRoomToast('방 생성 실패')
