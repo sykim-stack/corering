@@ -203,48 +203,48 @@ async function handleCreateRoom(req, res) {
         return res.status(500).json({ error: 'Step2 실패', detail: e.message });
     }
 
-    // ── Step 3: CoreNull 집 자동 생성 ──
-    let house;
-    try {
-        const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-        const { data, error: houseErr } = await supabaseService
-            .schema('corenull')
-            .from('houses')
-            .insert({
-                slug,
-                core_user_id: coreUser.id,
-                category: 'daily',
-                house_type: 'personal',
-                name: slug,
-            })
-            .select()
-            .single();
+ // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
+let house = null;
+try {
+    const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
+    const { data, error: houseErr } = await supabaseService
+        .schema('corenull')
+        .from('houses')
+        .insert({
+            slug,
+            core_user_id: coreUser.id,
+            category: 'daily',
+            name: slug,
+        })
+        .select()
+        .single();
 
-        if (houseErr) throw new Error('houses 생성 실패: ' + houseErr.message);
+    if (houseErr) {
+        console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
+    } else {
         house = data;
-    } catch (e) {
-        return res.status(500).json({ error: 'Step3 실패', detail: e.message });
     }
+} catch (e) {
+    console.error('Step3 예외 (무시):', e.message);
+}
 
-    // ── Step 4: space_id 연결 ──
+// ── Step 4: space_id 연결 (house 있을 때만) ──
+if (house) {
     try {
-        const { error: updateErr } = await supabaseService
+        await supabaseService
             .from('chat_rooms')
             .update({ space_id: house.id })
             .eq('id', room.id);
-
-        if (updateErr) throw new Error('space_id 연결 실패: ' + updateErr.message);
     } catch (e) {
-        // space_id 연결 실패는 치명적이지 않음 — 방/집은 생성된 상태
         console.error('Step4 경고:', e.message);
     }
-
-    return res.json({
-        room:      { ...room, space_id: house.id },
-        core_user: coreUser,
-        house:     { id: house.id, slug: house.slug },
-    });
 }
+
+return res.json({
+    room:      { ...room, space_id: house?.id || null },
+    core_user: coreUser,
+    house:     house ? { id: house.id, slug: house.slug } : null,
+});
 
 // ─────────────────────────────────────────────
 // DELETE ROOM
