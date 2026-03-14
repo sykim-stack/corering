@@ -600,9 +600,7 @@ async function handleSend() {
         <div class="box-top" id="t-${tempId}">
             <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>
         </div>
-        <div class="box-bottom" style="font-size:11px; color:#6aba6a; margin-top:4px;">
-    👤 ${getNickname() || '나'}
-</div>`;
+        <div class="box-bottom">${text}</div>`;
     history.appendChild(pairDiv);
     pairDiv.scrollIntoView({ behavior: 'smooth' });
 
