@@ -292,8 +292,6 @@ async function createNewRoom() {
             console.log('[createRoom] 응답 status:', res.status)  // ← 2번
             const data = await res.json()
             console.log('[createRoom 응답]', JSON.stringify(data, null, 2))  // ← 3번
-            })
-            const data = await res.json()
 
             if (!res.ok) {
                 showRoomToast('방 생성 실패: ' + (data.error || res.status))
