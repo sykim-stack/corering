@@ -1,0 +1,106 @@
+/* ── 채팅방 레이어 ── */
+#room-layer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+#room-list {
+    padding: 24px 20px;
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ── 닉네임 모달 ── */
+#nickname-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+}
+
+/* ── 공유 모달 ── */
+#share-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 300;
+    padding: 20px;
+}
+
+/* ── 토스트 ── */
+#room-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: #aaa;
+    border: 1px solid #2a2a2a;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: monospace;
+    z-index: 9999;
+    white-space: nowrap;
+    letter-spacing: 1px;
+}
+
+/* ── 모드 토스트 ── */
+#mode-toast {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    z-index: 999;
+    transition: opacity 0.4s;
+}
+
+/* ── 채팅 헤더 컨트롤 ── */
+#chat-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#room-code-btn {
+    background: none;
+    border: 1px solid #2a4a2a;
+    color: #6aba6a;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    font-family: monospace;
+    cursor: pointer;
+}
+
+#exit-chat-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #777;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-family: monospace;
+    cursor: pointer;
+}
