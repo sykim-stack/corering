@@ -1,12 +1,15 @@
 // ============================================================
-// BRAINPOOL | CoreRing Engine v3.6
+// BRAINPOOL | CoreRing Engine v3.7
 // RING 모드: DeepL 번역 + 단어 카드
-// CHAT 모드: Gemini 멀티턴 + 국제결혼 특화
+// CHAT 모드: C안 - 전송만, 번역 버튼 방식
 //
-// v3.6 수정사항:
-//   - runMindWorld()에 conflicts 전달 (의도 분석 정확도 향상)
-//   - RING/CHAT 모드 모두 intent 배지 추가
-//   - saveTranslationLog()에 intent, intentConf 전달
+// v3.7 수정사항:
+//   - CHAT 모드 + 방 연결 시 자동번역 OFF
+//   - sendChatOnly() — 원문 전송 + 번역 버튼 카드
+//   - buildChatCard() — 채팅 카드 HTML 생성
+//   - translateChatMsg() — 번역 버튼 클릭 시 DeepL 호출
+//   - appendChatToHistory() — 상대방 메시지 수신 표시
+//   - switchToChatMode() / switchToRingMode() — 헤더 전환
 // ============================================================
 
 let CORE_DICTIONARY     = [];
@@ -148,24 +151,6 @@ async function initEngine() {
         CONFLICT_DICTIONARY = [];
     }
 }
-    // ─── send message ──────────────────────────────────────────────
-async function sendMessage(text){
-
-    if(!currentRoom){
-        alert("ROOM 먼저 선택")
-        return
-    }
-
-    await fetch("/api/send_message",{
-        method:"POST",
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-            room_id:currentRoom,
-            message:text
-        })
-    })
-
-}
 
 // ─── 웰컴 화면 ───────────────────────────────────────────────
 const WELCOME_PHRASES = [
@@ -297,11 +282,71 @@ function showModeToast(mode) {
         z-index: 999; transition: opacity 0.4s;
     `;
     toast.textContent = mode === 'CHAT'
-        ? '● CHAT MODE — 대화 맥락 유지'
+        ? '● CHAT MODE — 채팅 연결됨'
         : '● RING MODE — 단어 분석';
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; }, 2000);
     setTimeout(() => toast.remove(), 2400);
+}
+
+// ─── CHAT 모드 전환 (방 연결 시) ────────────────────────────
+function switchToChatMode(room) {
+    currentMode = 'CHAT';
+    localStorage.setItem('core_mode', 'CHAT');
+
+    // 로고 변경
+    const logoRing = document.querySelector('.logo-ring');
+    if (logoRing) logoRing.textContent = 'CHAT';
+
+    // ROOM 버튼 → 방번호 + 나가기 버튼으로 교체
+    const roomToggle = document.getElementById('room-toggle');
+    if (roomToggle) {
+        roomToggle.outerHTML = `
+            <div id="chat-header-controls" style="display:flex; align-items:center; gap:8px;">
+                <button id="room-code-btn" onclick="toggleRooms()" style="
+                    background:none; border:1px solid #2a4a2a;
+                    color:#6aba6a; padding:4px 14px; border-radius:20px;
+                    font-size:10px; letter-spacing:2px; font-family:monospace; cursor:pointer;
+                ">● ${room.invite_code}</button>
+                <button id="exit-chat-btn" onclick="exitChatMode()" style="
+                    background:none; border:1px solid rgba(255,255,255,0.1);
+                    color:#777; padding:4px 12px; border-radius:20px;
+                    font-size:10px; letter-spacing:1px; font-family:monospace; cursor:pointer;
+                ">나가기</button>
+            </div>
+        `;
+    }
+
+    input.placeholder = '메시지 입력...';
+    showModeToast('CHAT');
+}
+
+// ─── RING 모드 복귀 ──────────────────────────────────────────
+function switchToRingMode() {
+    currentMode = 'RING';
+    localStorage.setItem('core_mode', 'RING');
+
+    // 로고 복귀
+    const logoRing = document.querySelector('.logo-ring');
+    if (logoRing) logoRing.textContent = 'RING';
+
+    // 헤더 컨트롤 → ROOM 버튼으로 복귀
+    const chatControls = document.getElementById('chat-header-controls');
+    if (chatControls) {
+        chatControls.outerHTML = `
+            <button id="room-toggle" style="
+                background:none; border:1px solid rgba(255,255,255,0.12);
+                cursor:pointer; color:currentColor; padding:4px 14px;
+                border-radius:20px; font-size:10px; letter-spacing:2px; font-family:monospace;
+            ">ROOM</button>
+        `;
+        // 이벤트 재등록
+        const newToggle = document.getElementById('room-toggle');
+        if (newToggle) newToggle.addEventListener('click', toggleRooms);
+    }
+
+    input.placeholder = '심장을 분석합니다...';
+    showModeToast('RING');
 }
 
 // ─── 세션 이벤트 트래킹 ───────────────────────────────────────
@@ -320,7 +365,6 @@ input.addEventListener('input', () => {
 });
 
 // ─── 의도 배지 생성 헬퍼 ─────────────────────────────────────
-// RING/CHAT 모드 공통 사용
 function buildIntentBadge(intent) {
     if (intent === 'THREAT') {
         return ' <span class="conflict-badge risk-badge">⚡ 강한 불만</span>';
@@ -334,7 +378,117 @@ function buildIntentBadge(intent) {
     return '';
 }
 
-// ─── CHAT 모드 처리 ───────────────────────────────────────────
+// ─── 채팅 카드 HTML 생성 ─────────────────────────────────────
+function buildChatCard(text, isKorean, msgId, isMe) {
+    const btnId    = 'translate-btn-' + (msgId || Date.now());
+    const resultId = 'translate-result-' + (msgId || Date.now());
+    return `
+        <div style="font-size:14px; line-height:1.6;">${text}</div>
+        <div id="${resultId}" style="
+            font-size:12px; color:#888; margin-top:6px;
+            border-top:1px solid #2a2a3a; padding-top:6px;
+            display:none;
+        "></div>
+        <button id="${btnId}" onclick="translateChatMsg('${btnId}', '${resultId}', ${isKorean})" style="
+            margin-top:8px; background:none;
+            border:1px solid ${isMe ? '#2a4a2a' : '#2a2a4a'};
+            color:${isMe ? '#4a8a4a' : '#6a6aaa'};
+            padding:3px 10px; border-radius:10px;
+            font-size:10px; letter-spacing:1px; cursor:pointer; font-family:monospace;
+        ">번역</button>
+    `;
+}
+
+// ─── 채팅 메시지 번역 (버튼 클릭 시) ────────────────────────
+async function translateChatMsg(btnId, resultId, isKorean) {
+    const btn      = document.getElementById(btnId);
+    const resultEl = document.getElementById(resultId);
+    if (!btn || !resultEl) return;
+
+    // 원문 찾기 — 버튼의 부모 box-top 안 첫 번째 div
+    const boxTop = btn.closest('.box-top');
+    const textEl = boxTop?.querySelector('div');
+    const text   = textEl?.innerText?.trim();
+    if (!text) return;
+
+    btn.textContent = '...';
+    btn.disabled    = true;
+
+    try {
+        const target = isKorean ? 'VI' : 'KO';
+        const res    = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
+        const data   = await res.json();
+        const translated = data.translations?.[0]?.text;
+
+        if (translated) {
+            resultEl.textContent  = translated;
+            resultEl.style.display = 'block';
+            btn.style.display      = 'none';
+        }
+    } catch(e) {
+        btn.textContent = '번역';
+        btn.disabled    = false;
+    }
+}
+
+// ─── C안: 전송만, 자동번역 없음 ──────────────────────────────
+async function sendChatOnly(text, isKorean, isLeft, tempId, pairDiv) {
+    try {
+        const res = await fetch("/api/corechat?action=send-message", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room_id:   currentRoom.id,
+                nickname:  currentRoom.nickname,
+                device_id: DEVICE_ID,
+                message:   text,
+            })
+        });
+        const data  = await res.json();
+        const msgId = data?.[0]?.id || null;
+        if (msgId && typeof sentMsgIds !== 'undefined') sentMsgIds.add(msgId);
+
+        // chat-history에 내 메시지 카드 표시
+        document.getElementById(`t-${tempId}`).innerHTML = buildChatCard(text, isKorean, msgId, true);
+        pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
+
+    } catch(e) {
+        document.getElementById(`t-${tempId}`).innerText = '전송 실패';
+        console.error('[sendChatOnly]', e);
+    }
+}
+
+// ─── 상대방 메시지 chat-history에 추가 ──────────────────────
+function appendChatToHistory(msg) {
+    if (!history) return;
+
+    // 중복 방지
+    if (msg.id && history.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+
+    const isKorean = /[ㄱ-ㅎ|가-힣]/.test(msg.message);
+
+    if (msgCount === 0) {
+        firstLang = isKorean ? 'ko' : 'vi';
+        const wc = document.getElementById('welcome-card');
+        if (wc) wc.remove();
+    }
+    msgCount++;
+
+    const isLeft  = firstLang === 'ko' ? isKorean : !isKorean;
+
+    const pairDiv = document.createElement('div');
+    pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
+    if (msg.id) pairDiv.dataset.msgId = msg.id;
+
+    pairDiv.innerHTML = `
+        <div class="box-top">${buildChatCard(msg.message, isKorean, msg.id, false)}</div>
+        <div class="box-bottom">${msg.nickname || '상대방'}</div>
+    `;
+    history.appendChild(pairDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+// ─── CHAT 모드 처리 (방 미연결 시 Gemini 자동번역) ──────────
 async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
     try {
         const res = await fetch('/api/corechat?action=chat', {
@@ -353,36 +507,26 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
         if (!res.ok) throw new Error(data.error || '번역 오류');
 
         const translated = data.translated;
-
-        const checkText = isKorean ? translated : text;
-        const conflicts = detectConflicts(checkText, CONFLICT_DICTIONARY);
-
-        // ── v3.6: conflicts를 runMindWorld에 전달해 intent 재계산 ──
-        const mwFinal = runMindWorld({ rawScore: calcEmotionScore(text), inputText: text, sessionLogs, conflicts });
+        const checkText  = isKorean ? translated : text;
+        const conflicts  = detectConflicts(checkText, CONFLICT_DICTIONARY);
+        const mwFinal    = runMindWorld({ rawScore: calcEmotionScore(text), inputText: text, sessionLogs, conflicts });
 
         let topHtml = translated;
 
-        // 충돌 배지
         if (conflicts.length > 0) {
             const hasHigh = conflicts.some(c => c.severity === 'high');
             topHtml += hasHigh
                 ? ' <span class="conflict-badge">🔴 방언 주의</span>'
                 : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
         }
-
-        // 갈등 레벨 배지
         if (mwFinal.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
         } else if (mwFinal.level === 'MEDIUM') {
             topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
         }
-
-        // 순화 배지
         if (data.softTone) {
             topHtml += ' <span class="conflict-badge" style="background:rgba(240,180,41,0.15);color:#f0b429;">💛 순화됨</span>';
         }
-
-        // ── v3.6 신규: 의도 배지 ──
         topHtml += buildIntentBadge(mwFinal.intent);
 
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
@@ -419,9 +563,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
             }),
         }).catch(() => {});
 
-        pairDiv.onclick = () => {
-            showModal(text, translated, isKorean, checkText);
-        };
+        pairDiv.onclick = () => showModal(text, translated, isKorean, checkText);
 
     } catch (e) {
         document.getElementById(`t-${tempId}`).innerText = '번역 오류';
@@ -461,9 +603,14 @@ async function handleSend() {
 
     // ── 모드 분기 ──
     if (currentMode === 'CHAT') {
-        // CHAT은 conflicts 없이 1차 mw 계산 후 handleChatMode 내부에서 재계산
-        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts: [] });
-        await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft);
+        if (currentRoom) {
+            // C안: 방 연결 상태 → 전송만, 자동번역 없음
+            await sendChatOnly(text, isKorean, isLeft, tempId, pairDiv);
+        } else {
+            // 방 미연결 → Gemini 자동번역
+            const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts: [] });
+            await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft);
+        }
         return;
     }
 
@@ -473,37 +620,33 @@ async function handleSend() {
         const res            = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
         const data           = await res.json();
         const rawTranslation = data.translations[0].text;
-        if (typeof sendTranslationToRoom === 'function') sendTranslationToRoom(text, rawTranslation, isKorean ? 'KO→VI' : 'VI→KO');
+
+        if (typeof sendTranslationToRoom === 'function') {
+            sendTranslationToRoom(text, rawTranslation, isKorean ? 'KO→VI' : 'VI→KO');
+        }
 
         const checkText       = isKorean ? rawTranslation : text;
         const detectedDialect = detectDialectScore(checkText);
         const finalDialect    = resolveDialect({ detectedDialect, userLocale });
         const conflicts       = detectConflicts(checkText, CONFLICT_DICTIONARY);
-
-        // ── v3.6: conflicts 전달 ──
-        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts });
+        const mw              = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts });
 
         const sessionLog = { input: text, output: rawTranslation, rawScore, timestamp: Date.now() };
         sessionLogs.push(sessionLog);
 
         let topHtml = rawTranslation;
 
-        // 충돌 배지
         if (conflicts.length > 0) {
             const hasHigh = conflicts.some(c => c.severity === 'high');
             topHtml += hasHigh
                 ? ' <span class="conflict-badge">🔴 방언 주의</span>'
                 : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
         }
-
-        // 갈등 레벨 배지
         if (mw.level === 'HIGH') {
             topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
         } else if (mw.level === 'MEDIUM') {
             topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
         }
-
-        // ── v3.6 신규: 의도 배지 ──
         topHtml += buildIntentBadge(mw.intent);
 
         document.getElementById(`t-${tempId}`).innerHTML = topHtml;
@@ -535,7 +678,6 @@ async function handleSend() {
 
         autoSaveToDataset({ inputText: text, outputText: rawTranslation, isKorean });
 
-        // ── v3.6: intent 전달 ──
         await saveTranslationLog({
             inputText:      text,
             outputText:     rawTranslation,
@@ -621,8 +763,8 @@ function showModal(original, translated, isKorean, cardText) {
         if (!found) return;
         if (found.entry_type === 'auxiliary') return;
 
-        const standard      = found.standard || found.standard_word || cleanWord;
-        const southern      = found.southern || found.southern_word || cleanWord;
+        const standard       = found.standard || found.standard_word || cleanWord;
+        const southern       = found.southern || found.southern_word || cleanWord;
         const hasDialectDiff = standard.toLowerCase() !== southern.toLowerCase();
 
         let typeClass = '';
@@ -662,64 +804,6 @@ function showModal(original, translated, isKorean, cardText) {
         <div class="chunk-grid">${chunkHtml}</div>
     `;
     modal.style.display = 'flex';
-}
-// ─── CHAT 모드 전환 (방 연결 시) ────────────────────────────
-function switchToChatMode(room) {
-    currentMode = 'CHAT'
-    localStorage.setItem('core_mode', 'CHAT')
-
-    // 로고 변경
-    const logoRing = document.querySelector('.logo-ring')
-    if (logoRing) logoRing.textContent = 'CHAT'
-
-    // ROOM 버튼 → 방번호 + 나가기 버튼으로 교체
-    const roomToggle = document.getElementById('room-toggle')
-    if (roomToggle) {
-        roomToggle.outerHTML = `
-            <div id="chat-header-controls" style="display:flex; align-items:center; gap:8px;">
-                <button id="room-code-btn" onclick="toggleRooms()" style="
-                    background:none; border:1px solid #2a4a2a;
-                    color:#6aba6a; padding:4px 14px; border-radius:20px;
-                    font-size:10px; letter-spacing:2px; font-family:monospace; cursor:pointer;
-                ">● ${room.invite_code}</button>
-                <button id="exit-chat-btn" onclick="exitChatMode()" style="
-                    background:none; border:1px solid rgba(255,255,255,0.1);
-                    color:#777; padding:4px 12px; border-radius:20px;
-                    font-size:10px; letter-spacing:1px; font-family:monospace; cursor:pointer;
-                ">나가기</button>
-            </div>
-        `
-    }
-
-    input.placeholder = '메시지 입력...'
-    showModeToast('CHAT')
-}
-
-function switchToRingMode() {
-    currentMode = 'RING'
-    localStorage.setItem('core_mode', 'RING')
-
-    // 로고 복귀
-    const logoRing = document.querySelector('.logo-ring')
-    if (logoRing) logoRing.textContent = 'RING'
-
-    // 헤더 컨트롤 → ROOM 버튼으로 복귀
-    const chatControls = document.getElementById('chat-header-controls')
-    if (chatControls) {
-        chatControls.outerHTML = `
-            <button id="room-toggle" style="
-                background:none; border:1px solid rgba(255,255,255,0.12);
-                cursor:pointer; color:currentColor; padding:4px 14px;
-                border-radius:20px; font-size:10px; letter-spacing:2px; font-family:monospace;
-            ">ROOM</button>
-        `
-        // 이벤트 재등록
-        const newToggle = document.getElementById('room-toggle')
-        if (newToggle) newToggle.addEventListener('click', toggleRooms)
-    }
-
-    input.placeholder = '심장을 분석합니다...'
-    showModeToast('RING')
 }
 
 // ─── 이벤트 핸들러 ────────────────────────────────────────────

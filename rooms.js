@@ -450,8 +450,25 @@ function startPolling(roomId) {
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
             // 내 device_id 또는 이미 표시된 id 제외
-            msgs.filter(m => m.device_id !== DEVICE_ID && !sentMsgIds.has(m.id))
-                .forEach(m => appendMessage(m))
+            pollingTimer = setInterval(async () => {
+                if (!currentRoom || !document.getElementById("chat-history")) {
+                    stopPolling(); return
+                }
+                try {
+                    const url = `/api/corechat?action=get-messages&room_id=${currentRoom.id}&after=${encodeURIComponent(lastMsgTimestamp)}`
+                    const res  = await fetch(url)
+                    const msgs = await res.json()
+                    if (!msgs || msgs.length === 0) return
+        
+                    msgs.filter(m => m.device_id !== DEVICE_ID && !sentMsgIds.has(m.id))
+                        .forEach(m => {
+                            if (typeof appendChatToHistory === 'function') {
+                                appendChatToHistory(m)   // engine.js로 전달
+                            }
+                        })
+                    lastMsgTimestamp = msgs[msgs.length - 1].created_at
+                } catch(e) {}
+            }, 3000)
             lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
     }, 3000)
