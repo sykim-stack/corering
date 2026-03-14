@@ -154,22 +154,39 @@ async function handleCreateRoom(req, res) {
     const { device_id, room_type = 'dm' } = req.body;
     if (!device_id) return res.status(400).json({ error: 'device_id 필수' });
 
+    // ── Step 1: CoreID 확정 (public.core_users) ──
+    let coreUser;
     try {
-        // Step 1: CoreID 확정
-        let coreUser;
-        const existingList = await corechatFetch(
-            `core_users?device_id=eq.${encodeURIComponent(device_id)}&limit=1`
-        );
-        if (existingList.length > 0) {
-            coreUser = existingList[0];
+        const { data: existing, error: findErr } = await supabaseService
+            .from('core_users')
+            .select('*')
+            .eq('device_id', device_id)
+            .limit(1);
+
+        if (findErr) throw new Error('core_users 조회 실패: ' + findErr.message);
+
+        if (existing && existing.length > 0) {
+            coreUser = existing[0];
         } else {
             const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
-            const created = await corechatFetch('core_users', 'POST', { core_id: coreId, device_id });
-            coreUser = Array.isArray(created) ? created[0] : created;
-        }
+            const { data: created, error: createErr } = await supabaseService
+                .from('core_users')
+                .insert({ core_id: coreId, device_id })
+                .select()
+                .single();
 
-        // Step 2: CoreChat 방 생성
-        const { data: room, error: roomErr } = await supabaseService
+            if (createErr) throw new Error('core_users 생성 실패: ' + createErr.message);
+            coreUser = created;
+        }
+    } catch (e) {
+        // Step 1 실패 → 즉시 종료, Step 2 절대 실행 안 됨
+        return res.status(500).json({ error: 'Step1 실패', detail: e.message });
+    }
+
+    // ── Step 2: CoreChat 방 생성 ──
+    let room;
+    try {
+        const { data, error: roomErr } = await supabaseService
             .from('chat_rooms')
             .insert({
                 room_type,
@@ -179,11 +196,18 @@ async function handleCreateRoom(req, res) {
             })
             .select()
             .single();
-        if (roomErr) throw new Error(roomErr.message);
 
-        // Step 3: CoreNull 집 자동 생성
+        if (roomErr) throw new Error('chat_rooms 생성 실패: ' + roomErr.message);
+        room = data;
+    } catch (e) {
+        return res.status(500).json({ error: 'Step2 실패', detail: e.message });
+    }
+
+    // ── Step 3: CoreNull 집 자동 생성 ──
+    let house;
+    try {
         const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-        const { data: house, error: houseErr } = await supabaseService
+        const { data, error: houseErr } = await supabaseService
             .schema('corenull')
             .from('houses')
             .insert({
@@ -195,23 +219,31 @@ async function handleCreateRoom(req, res) {
             })
             .select()
             .single();
-        if (houseErr) throw new Error(houseErr.message);
 
-        // Step 4: space_id 연결
-        await supabaseService
+        if (houseErr) throw new Error('houses 생성 실패: ' + houseErr.message);
+        house = data;
+    } catch (e) {
+        return res.status(500).json({ error: 'Step3 실패', detail: e.message });
+    }
+
+    // ── Step 4: space_id 연결 ──
+    try {
+        const { error: updateErr } = await supabaseService
             .from('chat_rooms')
             .update({ space_id: house.id })
             .eq('id', room.id);
 
-        return res.json({
-            room:      { ...room, space_id: house.id },
-            core_user: coreUser,
-            house:     { id: house.id, slug: house.slug },
-        });
-
+        if (updateErr) throw new Error('space_id 연결 실패: ' + updateErr.message);
     } catch (e) {
-        return res.status(500).json({ error: e.message });
+        // space_id 연결 실패는 치명적이지 않음 — 방/집은 생성된 상태
+        console.error('Step4 경고:', e.message);
     }
+
+    return res.json({
+        room:      { ...room, space_id: house.id },
+        core_user: coreUser,
+        house:     { id: house.id, slug: house.slug },
+    });
 }
 
 // ─────────────────────────────────────────────
