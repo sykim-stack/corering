@@ -484,8 +484,10 @@ function appendChatToHistory(msg) {
     if (msg.id) pairDiv.dataset.msgId = msg.id;
 
     pairDiv.innerHTML = `
-        <div class="box-top">${buildChatCard(msg.message, isKorean, msg.id, false)}</div>
-        <div class="box-bottom">${msg.nickname || '상대방'}</div>
+    <div class="box-top">${buildChatCard(msg.message, isKorean, msg.id, false)}</div>
+    <div class="box-bottom" style="font-size:11px; color:#6a6aaa; margin-top:4px;">
+        💬 ${msg.nickname || '상대방'}
+    </div>
     `;
     history.appendChild(pairDiv);
     history.scrollTop = history.scrollHeight;
