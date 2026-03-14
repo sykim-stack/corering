@@ -29,6 +29,7 @@ async function corechatFetch(path, method = 'GET', body = null) {
         body: body ? JSON.stringify(body) : null,
     });
     const data = await res.json();
+    console.log('[createRoom 응답]', JSON.stringify(data, null, 2))  // ← 추가
     if (!res.ok) throw new Error(JSON.stringify(data));
     return data;
 }
