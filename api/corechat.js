@@ -1,5 +1,5 @@
 // ============================================================
-// BRAINPOOL | CoreChat — 통합 API v2.1
+// BRAINPOOL | CoreChat — 통합 API v2.2
 // ============================================================
 
 const { createClient } = require('@supabase/supabase-js');
@@ -182,19 +182,19 @@ async function handleCreateRoom(req, res) {
         return res.status(500).json({ error: 'Step1 실패', detail: e.message });
     }
 
+    // ── slug 사전 선언 ──
+    const slug = 'house_' + Math.random().toString(36).slice(2, 8).toLowerCase();
+
     // ── Step 2: CoreChat 방 생성 ──
     let room;
     try {
         const { data, error: roomErr } = await supabaseService
             .from('chat_rooms')
             .insert({
-                slug,
-                name:           slug,
-                owner_id:       coreUser.id,
-                core_user_id:   coreUser.id,
-                house_type:     'family',   // ← basic → family
-                category:       'daily',
-                is_public:      false,
+                room_type,
+                owner_device_id: device_id,
+                core_user_id: coreUser.id,
+                is_permanent: true,
             })
             .select()
             .single();
@@ -206,59 +206,34 @@ async function handleCreateRoom(req, res) {
     }
 
     // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
-let house = null;
-try {
-    // ── slug 사전 선언 ──
-const slug = 'house_' + Math.random().toString(36).slice(2, 8).toLowerCase();
+    let house = null;
+    let houseError = null;
+    try {
+        const { data, error: houseErr } = await supabaseService
+            .schema('corenull')
+            .from('houses')
+            .insert({
+                slug,
+                name:         slug,
+                owner_id:     coreUser.id,
+                core_user_id: coreUser.id,
+                house_type:   'family',
+                category:     'daily',
+                is_public:    false,
+            })
+            .select()
+            .single();
 
-// ── Step 2: CoreChat 방 생성 ──
-let room;
-try {
-    const { data, error: roomErr } = await supabaseService
-        .from('chat_rooms')
-        .insert({
-            room_type,
-            owner_device_id: device_id,
-            core_user_id: coreUser.id,
-            is_permanent: true,
-        })
-        .select()
-        .single();
-
-    if (roomErr) throw new Error('chat_rooms 생성 실패: ' + roomErr.message);
-    room = data;
-} catch (e) {
-    return res.status(500).json({ error: 'Step2 실패', detail: e.message });
-}
-// ── Step 3 ──
-let house = null;
-let houseError = null;
-try {
-    const { data, error: houseErr } = await supabaseService
-        .schema('corenull')
-        .from('houses')
-        .insert({
-            slug,
-            name:         slug,
-            owner_id:     coreUser.id,
-            core_user_id: coreUser.id,
-            house_type:   'family',
-            category:     'daily',
-            is_public:    false,
-        })
-        .select()
-        .single();
-
-    if (houseErr) {
-        console.error('Step3 경고:', houseErr.message);
-        houseError = houseErr.message;
-    } else {
-        house = data;
+        if (houseErr) {
+            console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
+            houseError = houseErr.message;
+        } else {
+            house = data;
+        }
+    } catch (e) {
+        console.error('Step3 예외 (무시):', e.message);
+        houseError = e.message;
     }
-} catch (e) {
-    console.error('Step3 예외:', e.message);
-    houseError = e.message;
-}
 
     // ── Step 4: space_id 연결 (house 있을 때만) ──
     if (house) {
@@ -273,11 +248,12 @@ try {
     }
 
     return res.json({
-        room:      { ...room, space_id: house?.id || null },
-        core_user: coreUser,
-        house:     house ? { id: house.id, slug: house.slug } : null,
+        room:        { ...room, space_id: house?.id || null },
+        core_user:   coreUser,
+        house:       house ? { id: house.id, slug: house.slug } : null,
+        house_error: houseError || null,
     });
-} // ← 여기가 빠져 있었음
+}
 
 // ─────────────────────────────────────────────
 // DELETE ROOM
