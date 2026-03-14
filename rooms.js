@@ -515,8 +515,10 @@ async function createNewRoom() {
 
             const room = data.room || data
             if (room?.id) {
-                if (typeof switchToChatMode === 'function') switchToChatMode(room)  // 2. 로고 변경
-                shareInviteCode(room.invite_code)       // 3. 공유 모달 마지막
+                const layer = document.getElementById('room-layer')
+                if (layer) layer.style.display = 'none'   // ← 추가
+                if (typeof switchToChatMode === 'function') switchToChatMode(room)
+                shareInviteCode(room.invite_code)
             } else {
                 console.error('room.id 없음:', data)
                 showRoomToast('방 생성 실패')

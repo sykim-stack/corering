@@ -433,17 +433,20 @@ async function translateChatMsg(btnId, resultId, isKorean) {
 
 // ─── C안: 전송만, 자동번역 없음 ──────────────────────────────
 async function sendChatOnly(text, isKorean, isLeft, tempId, pairDiv) {
+    const room = (typeof currentRoom !== 'undefined') ? currentRoom : null
+    if (!room) return
+
     try {
         const res = await fetch("/api/corechat?action=send-message", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                room_id:   currentRoom.id,
-                nickname:  currentRoom.nickname,
+                room_id:   room.id,
+                nickname:  room.nickname,
                 device_id: DEVICE_ID,
                 message:   text,
             })
-        });
+        })
         const data  = await res.json();
         const msgId = data?.[0]?.id || null;
         if (msgId && typeof sentMsgIds !== 'undefined') sentMsgIds.add(msgId);
@@ -601,18 +604,20 @@ async function handleSend() {
 
     const rawScore = calcEmotionScore(text);
 
-    // ── 모드 분기 ──
-    if (currentMode === 'CHAT') {
-        if (currentRoom) {
-            // C안: 방 연결 상태 → 전송만, 자동번역 없음
-            await sendChatOnly(text, isKorean, isLeft, tempId, pairDiv);
-        } else {
-            // 방 미연결 → Gemini 자동번역
-            const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts: [] });
-            await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft);
-        }
-        return;
+// ── 모드 분기 ──
+if (currentMode === 'CHAT') {
+    // currentRoom을 직접 참조 (rooms.js 전역변수)
+    const room = (typeof currentRoom !== 'undefined') ? currentRoom : null
+    if (room && room.id) {
+        // C안: 방 연결 상태 → 전송만
+        await sendChatOnly(text, isKorean, isLeft, tempId, pairDiv)
+    } else {
+        // 방 미연결 → Gemini 자동번역
+        const mw = runMindWorld({ rawScore, inputText: text, sessionLogs, conflicts: [] })
+        await handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft)
     }
+    return
+}
 
     // ── RING 모드 (DeepL) ──
     try {
