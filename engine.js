@@ -663,6 +663,34 @@ function showModal(original, translated, isKorean, cardText) {
     `;
     modal.style.display = 'flex';
 }
+// ─── CHAT 모드 전환 (방 연결 시) ────────────────────────────
+function switchToChatMode(room) {
+    currentMode = 'CHAT'
+    localStorage.setItem('core_mode', 'CHAT')
+
+    const logoRing = document.querySelector('.logo-ring')
+    if (logoRing) logoRing.textContent = 'CHAT'
+
+    const label = document.getElementById('mode-label')
+    if (label) label.textContent = 'CHAT'
+
+    input.placeholder = '메시지 입력...'
+    showModeToast('CHAT')
+}
+
+function switchToRingMode() {
+    currentMode = 'RING'
+    localStorage.setItem('core_mode', 'RING')
+
+    const logoRing = document.querySelector('.logo-ring')
+    if (logoRing) logoRing.textContent = 'RING'
+
+    const label = document.getElementById('mode-label')
+    if (label) label.textContent = 'RING'
+
+    input.placeholder = '심장을 분석합니다...'
+    showModeToast('RING')
+}
 
 // ─── 이벤트 핸들러 ────────────────────────────────────────────
 const clearBtn   = document.getElementById('clear-btn');

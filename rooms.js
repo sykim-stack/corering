@@ -318,7 +318,8 @@ function exitChatView() {
     stopPolling()
     currentRoom = null
     clearRoomHeader()
-    roomLayer.style.display = "none"  // 레이어 닫기 → 번역기 화면
+    roomLayer.style.display = 'none'
+    if (typeof switchToRingMode === 'function') switchToRingMode()
     showRoomToast('번역기로 돌아왔습니다.')
 }
 
@@ -506,7 +507,7 @@ async function createNewRoom() {
 
             const room = data.room || data
             if (room?.id) {
-                openChatView(room, name || nickname || '익명')
+                if (typeof switchToChatMode === 'function') switchToChatMode(room)
                 shareInviteCode(room.invite_code)
                 await showRoomListView()
             } else {
