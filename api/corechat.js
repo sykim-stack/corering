@@ -203,29 +203,32 @@ async function handleCreateRoom(req, res) {
     }
 
     // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
-    let house = null;
-    try {
-        const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-        const { data, error: houseErr } = await supabaseService
-            .schema('corenull')
-            .from('houses')
-            .insert({
-                slug,
-                core_user_id: coreUser.id,
-                category: 'daily',
-                name: slug,
-            })
-            .select()
-            .single();
+let house = null;
+try {
+    const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
+    const { data, error: houseErr } = await supabaseService
+        .schema('corenull')
+        .from('houses')
+        .insert({
+            slug,
+            name:           slug,
+            owner_id:       coreUser.id,
+            core_user_id:   coreUser.id,
+            house_type:     'basic',
+            category:       'daily',
+            is_public:      false,
+        })
+        .select()
+        .single();
 
-        if (houseErr) {
-            console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
-        } else {
-            house = data;
-        }
-    } catch (e) {
-        console.error('Step3 예외 (무시):', e.message);
+    if (houseErr) {
+        console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
+    } else {
+        house = data;
     }
+} catch (e) {
+    console.error('Step3 예외 (무시):', e.message);
+}
 
     // ── Step 4: space_id 연결 (house 있을 때만) ──
     if (house) {
