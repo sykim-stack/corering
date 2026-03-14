@@ -218,7 +218,9 @@ async function doJoin(code, nickname) {
         })
         const room = await res.json()
         if (room.id) {
-            openChatView(room, nickname || '익명')
+            if (typeof switchToChatMode === 'function') switchToChatMode(room)  // ← 추가
+            const layer = document.getElementById('room-layer')
+            if (layer) layer.style.display = 'none'  // ← 레이어 닫기
         } else {
             showRoomToast('존재하지 않는 코드입니다.')
         }
@@ -509,7 +511,6 @@ async function createNewRoom() {
 
             const room = data.room || data
             if (room?.id) {
-                await showRoomListView()                // 1. 목록 먼저
                 if (typeof switchToChatMode === 'function') switchToChatMode(room)  // 2. 로고 변경
                 shareInviteCode(room.invite_code)       // 3. 공유 모달 마지막
             } else {
