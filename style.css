@@ -335,3 +335,12 @@ footer {
     border-radius: 20px;
     margin-left: 6px;
 }
+
+.chat-text-original {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.45;
+    font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
+    text-align: right;
+    width: 100%;
+}

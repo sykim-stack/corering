@@ -368,24 +368,29 @@ function buildIntentBadge(intent) {
 // ─── 채팅 카드 HTML 생성 ─────────────────────────────────────
 // 번역 전: 원문 크게 + 번역 버튼
 // 번역 후: translateChatMsg()가 box-top 전체 교체
+// ─── 채팅 카드 HTML 생성 ─────────────────────────────────────
 function buildChatCard(text, isKorean, msgId, isMe) {
     const uid   = (msgId || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
     const btnId = 'tbtn-' + uid;
     return `
-        <div class="chat-text-original" style="
-            font-size:1.35rem; font-weight:800; line-height:1.45;
-            font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;
-            margin-bottom:10px;
-        ">${text}</div>
-        <button id="${btnId}"
-            onclick="translateChatMsg(this, ${isKorean})"
-            style="
-                background:none;
-                border:1px solid #333; color:#666;
-                padding:3px 12px; border-radius:10px;
-                font-size:10px; letter-spacing:1px;
-                cursor:pointer; font-family:monospace;
-            ">번역</button>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+            <div class="chat-text-original">${text}</div>
+            <button id="${btnId}"
+                onclick="translateChatMsg(this, ${isKorean})"
+                style="
+                    background:none;
+                    border:1px solid rgba(128,128,128,0.3);
+                    color:#888;
+                    padding:2px 10px;
+                    border-radius:10px;
+                    font-size:10px;
+                    letter-spacing:1px;
+                    cursor:pointer;
+                    font-family:monospace;
+                    line-height:1.8;
+                    align-self:flex-end;
+                ">번역</button>
+        </div>
     `;
 }
 
