@@ -496,10 +496,15 @@ async function createNewRoom() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
             })
-            const room = await res.json()
-            if (room.id) {
+            const data = await res.json()
+            const room = data.room || data  // 구조 대응
+            if (room?.id) {
                 openChatView(room, name || nickname || '익명')
                 shareInviteCode(room.invite_code)
+                await loadRooms()           // ← 목록 즉시 갱신
+            } else {
+                console.error('방 생성 응답:', data)
+                showRoomToast('방 생성 실패: ' + (data.error || '알 수 없는 오류'))
             }
         } catch(e) { showRoomToast('방 생성 실패') }
     }
