@@ -208,29 +208,27 @@ async function handleCreateRoom(req, res) {
     // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
 let house = null;
 try {
-    const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-    const { data, error: houseErr } = await supabaseService
-        .schema('corenull')
-        .from('houses')
+    // ── slug 사전 선언 ──
+const slug = 'house_' + Math.random().toString(36).slice(2, 8).toLowerCase();
+
+// ── Step 2: CoreChat 방 생성 ──
+let room;
+try {
+    const { data, error: roomErr } = await supabaseService
+        .from('chat_rooms')
         .insert({
-            slug,
-            name:           slug,
-            owner_id:       coreUser.id,
-            core_user_id:   coreUser.id,
-            house_type:     'basic',
-            category:       'daily',
-            is_public:      false,
+            room_type,
+            owner_device_id: device_id,
+            core_user_id: coreUser.id,
+            is_permanent: true,
         })
         .select()
         .single();
 
-    if (houseErr) {
-        console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
-    } else {
-        house = data;
-    }
+    if (roomErr) throw new Error('chat_rooms 생성 실패: ' + roomErr.message);
+    room = data;
 } catch (e) {
-    console.error('Step3 예외 (무시):', e.message);
+    return res.status(500).json({ error: 'Step2 실패', detail: e.message });
 }
 
     // ── Step 4: space_id 연결 (house 있을 때만) ──
