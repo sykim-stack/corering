@@ -518,7 +518,7 @@ async function createNewRoom() {
             showRoomToast('방 생성 실패')
         }
     }
-}
+
 // ─── 방 삭제 ─────────────────────────────────────────────────
 async function deleteRoom(roomId) {
     if (!confirm('방을 삭제하면 모든 메시지가 사라집니다. 삭제할까요?')) return
