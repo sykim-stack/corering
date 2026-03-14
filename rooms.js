@@ -32,17 +32,12 @@ function saveNickname(name)   { localStorage.setItem('cr_nickname', name) }
 
 const DEVICE_ID = getDeviceId()
 
-// 변경 — 번역기 로드 완료 후 실행
-window.addEventListener('load', async function autoJoinFromURL() {
+// ─── URL 자동 입장 ───────────────────────────────────────────
+;(async function autoJoinFromURL() {
     const params = new URLSearchParams(window.location.search)
     const code   = params.get('room')
     if (!code) return
     window.history.replaceState({}, '', window.location.pathname)
-    
-    // 번역기 UI 먼저 보여주고 잠깐 대기
-    await new Promise(r => setTimeout(r, 500))
-    
-    roomLayer.style.display = 'block'  // 레이어 열기
     const nickname = getNickname()
     if (nickname) {
         await doJoin(code.toUpperCase(), nickname)
@@ -52,7 +47,7 @@ window.addEventListener('load', async function autoJoinFromURL() {
             await doJoin(code.toUpperCase(), name)
         }})
     }
-})
+})()
 
 // ─── 토글 ────────────────────────────────────────────────────
 roomToggle.addEventListener("click", toggleRooms)
