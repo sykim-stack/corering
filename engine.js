@@ -668,11 +668,28 @@ function switchToChatMode(room) {
     currentMode = 'CHAT'
     localStorage.setItem('core_mode', 'CHAT')
 
+    // 로고 변경
     const logoRing = document.querySelector('.logo-ring')
     if (logoRing) logoRing.textContent = 'CHAT'
 
-    const label = document.getElementById('mode-label')
-    if (label) label.textContent = 'CHAT'
+    // ROOM 버튼 → 방번호 + 나가기 버튼으로 교체
+    const roomToggle = document.getElementById('room-toggle')
+    if (roomToggle) {
+        roomToggle.outerHTML = `
+            <div id="chat-header-controls" style="display:flex; align-items:center; gap:8px;">
+                <button id="room-code-btn" onclick="toggleRooms()" style="
+                    background:none; border:1px solid #2a4a2a;
+                    color:#6aba6a; padding:4px 14px; border-radius:20px;
+                    font-size:10px; letter-spacing:2px; font-family:monospace; cursor:pointer;
+                ">● ${room.invite_code}</button>
+                <button id="exit-chat-btn" onclick="exitChatMode()" style="
+                    background:none; border:1px solid rgba(255,255,255,0.1);
+                    color:#777; padding:4px 12px; border-radius:20px;
+                    font-size:10px; letter-spacing:1px; font-family:monospace; cursor:pointer;
+                ">나가기</button>
+            </div>
+        `
+    }
 
     input.placeholder = '메시지 입력...'
     showModeToast('CHAT')
@@ -682,11 +699,24 @@ function switchToRingMode() {
     currentMode = 'RING'
     localStorage.setItem('core_mode', 'RING')
 
+    // 로고 복귀
     const logoRing = document.querySelector('.logo-ring')
     if (logoRing) logoRing.textContent = 'RING'
 
-    const label = document.getElementById('mode-label')
-    if (label) label.textContent = 'RING'
+    // 헤더 컨트롤 → ROOM 버튼으로 복귀
+    const chatControls = document.getElementById('chat-header-controls')
+    if (chatControls) {
+        chatControls.outerHTML = `
+            <button id="room-toggle" style="
+                background:none; border:1px solid rgba(255,255,255,0.12);
+                cursor:pointer; color:currentColor; padding:4px 14px;
+                border-radius:20px; font-size:10px; letter-spacing:2px; font-family:monospace;
+            ">ROOM</button>
+        `
+        // 이벤트 재등록
+        const newToggle = document.getElementById('room-toggle')
+        if (newToggle) newToggle.addEventListener('click', toggleRooms)
+    }
 
     input.placeholder = '심장을 분석합니다...'
     showModeToast('RING')

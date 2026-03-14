@@ -314,11 +314,13 @@ function openChatView(room, nickname) {
 }
 
 // ─── 나가기 → 번역기로 복귀 ──────────────────────────────────
-function exitChatView() {
+function exitChatMode() {
     stopPolling()
     currentRoom = null
     clearRoomHeader()
-    roomLayer.style.display = 'none'
+    // room-layer 닫기
+    const layer = document.getElementById('room-layer')
+    if (layer) layer.style.display = 'none'
     if (typeof switchToRingMode === 'function') switchToRingMode()
     showRoomToast('번역기로 돌아왔습니다.')
 }
