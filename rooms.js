@@ -518,6 +518,7 @@ async function createNewRoom() {
             showRoomToast('방 생성 실패')
         }
     }
+}
 
 // ─── 방 삭제 ─────────────────────────────────────────────────
 async function deleteRoom(roomId) {
