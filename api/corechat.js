@@ -179,7 +179,6 @@ async function handleCreateRoom(req, res) {
             coreUser = created;
         }
     } catch (e) {
-        // Step 1 실패 → 즉시 종료, Step 2 절대 실행 안 됨
         return res.status(500).json({ error: 'Step1 실패', detail: e.message });
     }
 
@@ -203,48 +202,49 @@ async function handleCreateRoom(req, res) {
         return res.status(500).json({ error: 'Step2 실패', detail: e.message });
     }
 
- // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
-let house = null;
-try {
-    const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
-    const { data, error: houseErr } = await supabaseService
-        .schema('corenull')
-        .from('houses')
-        .insert({
-            slug,
-            core_user_id: coreUser.id,
-            category: 'daily',
-            name: slug,
-        })
-        .select()
-        .single();
-
-    if (houseErr) {
-        console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
-    } else {
-        house = data;
-    }
-} catch (e) {
-    console.error('Step3 예외 (무시):', e.message);
-}
-
-// ── Step 4: space_id 연결 (house 있을 때만) ──
-if (house) {
+    // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
+    let house = null;
     try {
-        await supabaseService
-            .from('chat_rooms')
-            .update({ space_id: house.id })
-            .eq('id', room.id);
-    } catch (e) {
-        console.error('Step4 경고:', e.message);
-    }
-}
+        const slug = 'house_' + coreUser.core_id.replace('core_user_', '').toLowerCase();
+        const { data, error: houseErr } = await supabaseService
+            .schema('corenull')
+            .from('houses')
+            .insert({
+                slug,
+                core_user_id: coreUser.id,
+                category: 'daily',
+                name: slug,
+            })
+            .select()
+            .single();
 
-return res.json({
-    room:      { ...room, space_id: house?.id || null },
-    core_user: coreUser,
-    house:     house ? { id: house.id, slug: house.slug } : null,
-});
+        if (houseErr) {
+            console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
+        } else {
+            house = data;
+        }
+    } catch (e) {
+        console.error('Step3 예외 (무시):', e.message);
+    }
+
+    // ── Step 4: space_id 연결 (house 있을 때만) ──
+    if (house) {
+        try {
+            await supabaseService
+                .from('chat_rooms')
+                .update({ space_id: house.id })
+                .eq('id', room.id);
+        } catch (e) {
+            console.error('Step4 경고:', e.message);
+        }
+    }
+
+    return res.json({
+        room:      { ...room, space_id: house?.id || null },
+        core_user: coreUser,
+        house:     house ? { id: house.id, slug: house.slug } : null,
+    });
+} // ← 여기가 빠져 있었음
 
 // ─────────────────────────────────────────────
 // DELETE ROOM
