@@ -372,19 +372,22 @@ function buildChatCard(text, isKorean, msgId, isMe) {
     const uid   = (msgId || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
     const btnId = 'tbtn-' + uid;
     return `
-        <div class="chat-text-original" style="
-            font-size:1.35rem; font-weight:800; line-height:1.45;
-            font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;
-            margin-bottom:10px;
-        ">${text}</div>
+        <div class="chat-text-original">${text}</div>
         <button id="${btnId}"
             onclick="translateChatMsg(this, ${isKorean})"
             style="
+                display:inline-block;
+                margin-top:6px;
                 background:none;
-                border:1px solid #333; color:#666;
-                padding:3px 12px; border-radius:10px;
-                font-size:10px; letter-spacing:1px;
-                cursor:pointer; font-family:monospace;
+                border:1px solid rgba(128,128,128,0.3);
+                color:#888;
+                padding:2px 10px;
+                border-radius:10px;
+                font-size:10px;
+                letter-spacing:1px;
+                cursor:pointer;
+                font-family:monospace;
+                line-height:1.8;
             ">번역</button>
     `;
 }
