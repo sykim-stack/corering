@@ -283,10 +283,15 @@ async function createNewRoom() {
     const create = async (name) => {
         if (name) saveNickname(name)
         try {
+            console.log('[createRoom] 호출 시작')  // ← 1번
             const res = await fetch("/api/corechat?action=create-room", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
+            })
+            console.log('[createRoom] 응답 status:', res.status)  // ← 2번
+            const data = await res.json()
+            console.log('[createRoom 응답]', JSON.stringify(data, null, 2))  // ← 3번
             })
             const data = await res.json()
 
