@@ -497,21 +497,28 @@ async function createNewRoom() {
                 body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
             })
             const data = await res.json()
-            const room = data.room || data  // 구조 대응
+            
+            if (!res.ok) {  // ← 추가
+                console.error('방 생성 API 오류:', data)
+                showRoomToast('방 생성 실패: ' + (data.error || data.detail || res.status))
+                return
+            }
+            
+            const room = data.room || data
             if (room?.id) {
                 openChatView(room, name || nickname || '익명')
                 shareInviteCode(room.invite_code)
-                await loadRooms()           // ← 목록 즉시 갱신
+                await loadRooms()
             } else {
-                console.error('방 생성 응답:', data)
-                showRoomToast('방 생성 실패: ' + (data.error || '알 수 없는 오류'))
+                console.error('room.id 없음:', data)
+                showRoomToast('방 생성 실패')
             }
-        } catch(e) { showRoomToast('방 생성 실패') }
+        } catch(e) {
+            console.error('방 생성 예외:', e)
+            showRoomToast('방 생성 실패')
+        }
     }
-    if (nickname) await create(nickname)
-    else showNicknameModal({ onConfirm: create })
 }
-
 // ─── 방 삭제 ─────────────────────────────────────────────────
 async function deleteRoom(roomId) {
     if (!confirm('방을 삭제하면 모든 메시지가 사라집니다. 삭제할까요?')) return
