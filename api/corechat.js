@@ -188,10 +188,13 @@ async function handleCreateRoom(req, res) {
         const { data, error: roomErr } = await supabaseService
             .from('chat_rooms')
             .insert({
-                room_type,
-                owner_device_id: device_id,
-                core_user_id: coreUser.id,
-                is_permanent: true,
+                slug,
+                name:           slug,
+                owner_id:       coreUser.id,
+                core_user_id:   coreUser.id,
+                house_type:     'family',   // ← basic → family
+                category:       'daily',
+                is_public:      false,
             })
             .select()
             .single();
