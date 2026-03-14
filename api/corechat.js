@@ -2,7 +2,7 @@
 // BRAINPOOL | CoreChat — 통합 API v2.1
 // ============================================================
 
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 const supabaseService = createClient(
     process.env.SUPABASE_URL,
