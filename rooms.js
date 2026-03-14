@@ -497,13 +497,13 @@ async function createNewRoom() {
                 body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
             })
             const data = await res.json()
-            
-            if (!res.ok) {  // ← 추가
+
+            if (!res.ok) {
                 console.error('방 생성 API 오류:', data)
                 showRoomToast('방 생성 실패: ' + (data.error || data.detail || res.status))
                 return
             }
-            
+
             const room = data.room || data
             if (room?.id) {
                 openChatView(room, name || nickname || '익명')
@@ -518,6 +518,9 @@ async function createNewRoom() {
             showRoomToast('방 생성 실패')
         }
     }
+    // ↓ 이 2줄이 빠져있었음
+    if (nickname) await create(nickname)
+    else showNicknameModal({ onConfirm: create })
 }
 
 // ─── 방 삭제 ─────────────────────────────────────────────────
