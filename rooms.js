@@ -1,8 +1,6 @@
 // ============================================================
-// BRAINPOOL | CoreRing rooms.js v6.1
-// - window.currentRoom 전역 공유 (engine.js 접근 가능)
-// - C안 구조: 채팅 UI는 engine.js chat-history에서 처리
-// - ROOM 레이어는 방 목록/관리 전용
+// BRAINPOOL | CoreRing rooms.js v6.2
+// - 채팅 알림 기능 추가 (탭 뱃지 + 진동 + Notification API)
 // ============================================================
 
 const roomLayer  = document.getElementById("room-layer")
@@ -30,6 +28,46 @@ function saveNickname(name) { localStorage.setItem('cr_nickname', name) }
 
 const DEVICE_ID = getDeviceId()
 
+// ─── 알림 권한 요청 ───────────────────────────────────────────
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission()
+    }
+}
+requestNotificationPermission()
+
+// ─── 새 메시지 알림 ───────────────────────────────────────────
+let unreadCount = 0
+
+function notifyNewMessage(msg) {
+    unreadCount++
+
+    // 탭 타이틀 뱃지
+    document.title = `(${unreadCount}) CoreChat`
+
+    // 진동 (모바일)
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+
+    // 브라우저 알림 (탭 비활성화 상태일 때만)
+    if (document.hidden && Notification.permission === 'granted') {
+        new Notification('CoreChat', {
+            body: msg.nickname
+                ? `${msg.nickname}: ${msg.message}`
+                : msg.message,
+            icon: '/icon-192.png',
+            tag:  'corechat-msg',   // 같은 tag면 덮어씌움 (스팸 방지)
+        })
+    }
+}
+
+// 탭 포커스 시 뱃지 초기화
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        unreadCount = 0
+        document.title = 'CoreChat'
+    }
+})
+
 // ─── URL 자동 입장 ───────────────────────────────────────────
 window.addEventListener('load', async function autoJoinFromURL() {
     const params = new URLSearchParams(window.location.search)
@@ -52,8 +90,6 @@ window.addEventListener('load', async function autoJoinFromURL() {
 
 // ─── 토글 ────────────────────────────────────────────────────
 function toggleRooms() {
-    const roomToggle = document.getElementById('room-toggle') ||
-                       document.getElementById('chat-header-controls')
     if (roomLayer.style.display === "none" || !roomLayer.style.display) {
         showRoomListView()
         roomLayer.style.display = "block"
@@ -158,7 +194,6 @@ function renderRoomItems() {
             </div>
         `
         div.onclick = () => {
-            // 방 클릭 시 CHAT 모드로 전환 (레이어 닫기)
             const nickname = getNickname() || '익명'
             window.currentRoom = { ...room, nickname }
             lastMsgTimestamp = new Date().toISOString()
@@ -255,10 +290,12 @@ function startPolling(roomId) {
             const msgs = await res.json()
             if (!msgs || msgs.length === 0) return
 
-            msgs.filter(m => m.device_id !== DEVICE_ID && !sentMsgIds.has(m.id))
-                .forEach(m => {
-                    if (typeof appendChatToHistory === 'function') appendChatToHistory(m)
-                })
+            const newMsgs = msgs.filter(m => m.device_id !== DEVICE_ID && !sentMsgIds.has(m.id))
+            newMsgs.forEach(m => {
+                if (typeof appendChatToHistory === 'function') appendChatToHistory(m)
+                notifyNewMessage(m)
+            })
+
             lastMsgTimestamp = msgs[msgs.length - 1].created_at
         } catch(e) {}
     }, 3000)
@@ -272,6 +309,8 @@ function stopPolling() {
 function exitChatMode() {
     stopPolling()
     window.currentRoom = null
+    unreadCount = 0
+    document.title = 'CoreChat'
     roomLayer.style.display = 'none'
     if (typeof switchToRingMode === 'function') switchToRingMode()
     showRoomToast('번역기로 돌아왔습니다.')
@@ -283,15 +322,12 @@ async function createNewRoom() {
     const create = async (name) => {
         if (name) saveNickname(name)
         try {
-            console.log('[createRoom] 호출 시작')  // ← 1번
             const res = await fetch("/api/corechat?action=create-room", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
             })
-            console.log('[createRoom] 응답 status:', res.status)  // ← 2번
             const data = await res.json()
-            console.log('[createRoom 응답]', JSON.stringify(data, null, 2))  // ← 3번
 
             if (!res.ok) {
                 showRoomToast('방 생성 실패: ' + (data.error || res.status))
