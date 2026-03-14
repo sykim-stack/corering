@@ -395,12 +395,7 @@ async function translateChatMsg(btn, isKorean) {
         if (translated) {
             // RING 카드 구조로 교체: 번역 크게 + 원문 작게
             boxTop.innerHTML = `
-                <div style="
-                    font-size:1.35rem; font-weight:800; line-height:1.45;
-                    font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;
-                    margin-bottom:6px;
-                ">${translated}</div>
-                <div style="font-size:0.9rem; color:#888; line-height:1.5;">${text}</div>
+`<div style="font-size:1.35rem;font-weight:800;line-height:1.45;font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;margin-bottom:6px;">${translated}</div><div style="font-size:0.9rem;color:#888;line-height:1.5;">${text}</div>`
             `;
         }
     } catch(e) {
