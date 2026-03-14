@@ -230,6 +230,35 @@ try {
 } catch (e) {
     return res.status(500).json({ error: 'Step2 실패', detail: e.message });
 }
+// ── Step 3 ──
+let house = null;
+let houseError = null;
+try {
+    const { data, error: houseErr } = await supabaseService
+        .schema('corenull')
+        .from('houses')
+        .insert({
+            slug,
+            name:         slug,
+            owner_id:     coreUser.id,
+            core_user_id: coreUser.id,
+            house_type:   'family',
+            category:     'daily',
+            is_public:    false,
+        })
+        .select()
+        .single();
+
+    if (houseErr) {
+        console.error('Step3 경고:', houseErr.message);
+        houseError = houseErr.message;
+    } else {
+        house = data;
+    }
+} catch (e) {
+    console.error('Step3 예외:', e.message);
+    houseError = e.message;
+}
 
     // ── Step 4: space_id 연결 (house 있을 때만) ──
     if (house) {
