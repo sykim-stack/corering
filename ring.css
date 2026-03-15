@@ -233,7 +233,10 @@ main::-webkit-scrollbar { width: 0; }
     font-family: monospace;
     display: block;        /* inline 공백 노드 차단 */
     width: fit-content;    /* block인데 콘텐츠 너비만 */
-    margin-left: auto;   /* 추가: 오른쪽 카드에서 자동으로 우측 정렬 */
+}
+/* pair-right(흰 카드)일 때만 우측 정렬 */
+.pair-right .chat-card-btn {
+    margin-left: auto;
 }
 
 /* ── 웰컴 카드 ── */
