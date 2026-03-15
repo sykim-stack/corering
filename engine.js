@@ -366,15 +366,12 @@ function buildIntentBadge(intent) {
 }
 
 // ─── 채팅 카드 HTML 생성 ─────────────────────────────────────
+// 번역 전: 원문 크게 + 번역 버튼
+// 번역 후: translateChatMsg()가 box-top 전체 교체
 function buildChatCard(text, isKorean, msgId, isMe) {
-    const uid   = (msgId || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
+    const uid = (msgId || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
     const btnId = 'tbtn-' + uid;
-    return `
-        <div class="chat-text-original" style="font-size:1.35rem; font-weight:800; line-height:1.45;font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;margin:0 0 6px 0;">${text}</div>
-        <div style="line-height:1;">
-            <button id="${btnId}" onclick="translateChatMsg(this, ${isKorean})" style="background:none; border:1px solid #2a2a2a; color:#555;padding:3px 12px; border-radius:10px; font-size:10px;letter-spacing:1px; cursor:pointer; font-family:monospace;display:inline-block; vertical-align:middle; line-height:1.6;">번역</button>
-        </div>
-    `;
+    return `<div class="chat-text-original" style="font-size:1.35rem;font-weight:800;line-height:1.45;font-family:'Be Vietnam Pro','Noto Sans KR',sans-serif;margin-bottom:10px;">${text}</div><button id="${btnId}" onclick="translateChatMsg(this, ${isKorean})" style="background:none;border:1px solid #333;color:#666;padding:3px 12px;border-radius:10px;font-size:10px;letter-spacing:1px;cursor:pointer;font-family:monospace;">번역</button>`;
 }
 
 // ─── 채팅 메시지 번역 (버튼 클릭 시) ────────────────────────
@@ -773,38 +770,3 @@ document.addEventListener('click', (e) => {
         });
     }
 });
-
-// ─── CHAT 모드 전환 (방 연결 시) ────────────────────────────
-function switchToChatMode(room) {
-    currentMode = 'CHAT';
-    localStorage.setItem('core_mode', 'CHAT');
-
-    const logoRing = document.querySelector('.logo-ring');
-    if (logoRing) logoRing.textContent = 'CHAT';
-
-    const roomToggle = document.getElementById('room-toggle');
-    if (roomToggle) {
-        roomToggle.outerHTML = `
-            <div id="chat-header-controls" style="display:flex; align-items:center; gap:8px;">
-                <button id="nickname-display-btn" onclick="changeNickname()" style="
-                    background:none; border:1px solid #2a2a2a;
-                    color:#555; padding:4px 12px; border-radius:20px;
-                    font-size:10px; letter-spacing:1px; font-family:monospace; cursor:pointer;
-                ">✎ ${room.nickname || getNickname() || '익명'}</button>
-                <button id="room-code-btn" onclick="toggleRooms()" style="
-                    background:none; border:1px solid #2a4a2a;
-                    color:#6aba6a; padding:4px 14px; border-radius:20px;
-                    font-size:10px; letter-spacing:2px; font-family:monospace; cursor:pointer;
-                ">● ${room.invite_code}</button>
-                <button id="exit-chat-btn" onclick="exitChatMode()" style="
-                    background:none; border:1px solid rgba(255,255,255,0.1);
-                    color:#777; padding:4px 12px; border-radius:20px;
-                    font-size:10px; letter-spacing:1px; font-family:monospace; cursor:pointer;
-                ">나가기</button>
-            </div>
-        `;
-    }
-
-    input.placeholder = '메시지 입력...';
-    showModeToast('CHAT');
-}
