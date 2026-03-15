@@ -1,6 +1,6 @@
 // ============================================================
-// BRAINPOOL | CoreRing rooms.js v6.2
-// - 채팅 알림 기능 추가 (탭 뱃지 + 진동 + Notification API)
+// BRAINPOOL | CoreRing rooms.js v6.3
+// - 새로고침 시 채팅방 자동 복귀 (URL 유지 방식)
 // ============================================================
 
 const roomLayer  = document.getElementById("room-layer")
@@ -11,7 +11,6 @@ let pollingTimer     = null
 let lastMsgTimestamp = null
 const sentMsgIds     = new Set()
 
-// ─── window.currentRoom 전역 공유 ────────────────────────────
 window.currentRoom = null
 
 // ─── device_id / nickname ────────────────────────────────────
@@ -28,6 +27,14 @@ function saveNickname(name) { localStorage.setItem('cr_nickname', name) }
 
 const DEVICE_ID = getDeviceId()
 
+// ─── URL 관리 ────────────────────────────────────────────────
+function setRoomURL(code) {
+    window.history.replaceState({}, '', `?room=${code}`)
+}
+function clearRoomURL() {
+    window.history.replaceState({}, '', window.location.pathname)
+}
+
 // ─── 알림 권한 요청 ───────────────────────────────────────────
 function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -41,26 +48,17 @@ let unreadCount = 0
 
 function notifyNewMessage(msg) {
     unreadCount++
-
-    // 탭 타이틀 뱃지
     document.title = `(${unreadCount}) CoreChat`
-
-    // 진동 (모바일)
     if (navigator.vibrate) navigator.vibrate([100, 50, 100])
-
-    // 브라우저 알림 (탭 비활성화 상태일 때만)
     if (document.hidden && Notification.permission === 'granted') {
         new Notification('CoreChat', {
-            body: msg.nickname
-                ? `${msg.nickname}: ${msg.message}`
-                : msg.message,
+            body: msg.nickname ? `${msg.nickname}: ${msg.message}` : msg.message,
             icon: '/icon-192.png',
-            tag:  'corechat-msg',   // 같은 tag면 덮어씌움 (스팸 방지)
+            tag:  'corechat-msg',
         })
     }
 }
 
-// 탭 포커스 시 뱃지 초기화
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         unreadCount = 0
@@ -73,7 +71,7 @@ window.addEventListener('load', async function autoJoinFromURL() {
     const params = new URLSearchParams(window.location.search)
     const code   = params.get('room')
     if (!code) return
-    window.history.replaceState({}, '', window.location.pathname)
+    // URL 유지 (제거하지 않음 → 새로고침 시 재입장 가능)
 
     await new Promise(r => setTimeout(r, 300))
 
@@ -98,7 +96,6 @@ function toggleRooms() {
     }
 }
 
-// 초기 room-toggle 이벤트 등록
 const initialToggle = document.getElementById('room-toggle')
 if (initialToggle) initialToggle.addEventListener('click', toggleRooms)
 
@@ -197,6 +194,7 @@ function renderRoomItems() {
             const nickname = getNickname() || '익명'
             window.currentRoom = { ...room, nickname }
             lastMsgTimestamp = new Date().toISOString()
+            setRoomURL(room.invite_code)   // URL 유지
             roomLayer.style.display = 'none'
             if (typeof switchToChatMode === 'function') switchToChatMode(room)
             startPolling(room.id)
@@ -268,6 +266,7 @@ async function doJoin(code, nickname) {
         if (room.id) {
             window.currentRoom = { ...room, nickname: nickname || '익명' }
             lastMsgTimestamp   = new Date().toISOString()
+            setRoomURL(room.invite_code)   // URL 유지
             roomLayer.style.display = 'none'
             if (typeof switchToChatMode === 'function') switchToChatMode(room)
             startPolling(room.id)
@@ -311,6 +310,7 @@ function exitChatMode() {
     window.currentRoom = null
     unreadCount = 0
     document.title = 'CoreChat'
+    clearRoomURL()   // URL 초기화
     roomLayer.style.display = 'none'
     if (typeof switchToRingMode === 'function') switchToRingMode()
     showRoomToast('번역기로 돌아왔습니다.')
@@ -338,6 +338,7 @@ async function createNewRoom() {
             if (room?.id) {
                 window.currentRoom = { ...room, nickname: name || nickname || '익명' }
                 lastMsgTimestamp   = new Date().toISOString()
+                setRoomURL(room.invite_code)   // URL 유지
                 roomLayer.style.display = 'none'
                 if (typeof switchToChatMode === 'function') switchToChatMode(room)
                 startPolling(room.id)
@@ -469,22 +470,6 @@ function showNicknameModal({ onConfirm }) {
     inp.onkeypress = (e) => { if (e.key === 'Enter') confirm() }
 }
 
-// ─── 토스트 ──────────────────────────────────────────────────
-function showRoomToast(msg) {
-    const existing = document.getElementById('room-toast')
-    if (existing) existing.remove()
-    const toast = document.createElement('div')
-    toast.id = 'room-toast'
-    toast.textContent = msg
-    toast.style.cssText = `
-        position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-        background:#1a1a1a; color:#aaa; border:1px solid #2a2a2a;
-        padding:10px 20px; border-radius:20px; font-size:12px;
-        font-family:monospace; z-index:9999; white-space:nowrap; letter-spacing:1px;
-    `
-    document.body.appendChild(toast)
-    setTimeout(() => toast.remove(), 2500)
-}
 // ─── 닉네임 변경 ─────────────────────────────────────────────
 function changeNickname() {
     const current = getNickname() || ''
@@ -530,7 +515,6 @@ function changeNickname() {
         if (!name) { inp.style.borderColor = '#a55'; return }
         saveNickname(name)
         if (window.currentRoom) window.currentRoom.nickname = name
-        // 헤더 닉네임 표시 즉시 갱신
         const nicknameBtn = document.getElementById('nickname-display-btn')
         if (nicknameBtn) nicknameBtn.textContent = '✎ ' + name
         overlay.remove()
@@ -538,4 +522,21 @@ function changeNickname() {
     }
     btn.onclick    = confirm
     inp.onkeypress = (e) => { if (e.key === 'Enter') confirm() }
+}
+
+// ─── 토스트 ──────────────────────────────────────────────────
+function showRoomToast(msg) {
+    const existing = document.getElementById('room-toast')
+    if (existing) existing.remove()
+    const toast = document.createElement('div')
+    toast.id = 'room-toast'
+    toast.textContent = msg
+    toast.style.cssText = `
+        position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+        background:#1a1a1a; color:#aaa; border:1px solid #2a2a2a;
+        padding:10px 20px; border-radius:20px; font-size:12px;
+        font-family:monospace; z-index:9999; white-space:nowrap; letter-spacing:1px;
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 2500)
 }
