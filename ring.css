@@ -211,3 +211,139 @@ main::-webkit-scrollbar { width: 0; }
 }
 
 #modal-close:active { opacity: 0.85; }
+
+/* ── 채팅 카드 내부 ── */
+.chat-card-text {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.45;
+    font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
+    margin-bottom: 6px;
+}
+
+.chat-card-btn {
+    background: none;
+    border: 1px solid #2a2a2a;
+    color: #555;
+    padding: 3px 12px;
+    border-radius: 10px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    font-family: monospace;
+    display: block;        /* inline 공백 노드 차단 */
+    width: fit-content;    /* block인데 콘텐츠 너비만 */
+}
+
+/* ── 웰컴 카드 ── */
+.welcome-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 40px 24px;
+    text-align: center;
+    animation: fadeInUp 0.6s ease;
+}
+
+.welcome-date {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: #444;
+    margin-bottom: 32px;
+    text-transform: uppercase;
+}
+
+.welcome-box {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 32px 28px;
+    max-width: 320px;
+    width: 100%;
+}
+
+.welcome-vi {
+    font-size: 19px;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.welcome-divider {
+    width: 32px;
+    height: 1px;
+    background: rgba(255,255,255,0.15);
+    margin: 0 auto 16px;
+}
+
+.welcome-ko {
+    font-size: 14px;
+    color: #888;
+    line-height: 1.6;
+}
+
+.welcome-hint {
+    margin-top: 28px;
+    font-size: 12px;
+    color: #333;
+    letter-spacing: 1px;
+}
+
+.welcome-mode-tag {
+    margin-bottom: 12px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #f0b429;
+}
+
+/* ── 채팅 카드 ── */
+.chat-card-text {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.45;
+    font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
+    margin-bottom: 6px;
+}
+
+.chat-card-btn {
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    padding: 3px 12px;
+    border-radius: 10px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    font-family: monospace;
+    display: block;
+    width: fit-content;
+}
+
+/* ── 번역 후 카드 구조 ── */
+.chat-translated-text {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.45;
+    font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
+    margin-bottom: 6px;
+}
+
+.chat-original-text {
+    font-size: 0.9rem;
+    color: #888;
+    line-height: 1.5;
+}
+
+/* ── box-bottom 닉네임 (CHAT) ── */
+.box-bottom-nickname {
+    color: #6aba6a;
+    font-size: 11px;
+}
+
+.box-bottom-opponent {
+    font-size: 11px;
+    color: #6a6aaa;
+}
