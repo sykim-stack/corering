@@ -104,3 +104,18 @@
     font-family: monospace;
     cursor: pointer;
 }
+
+/* 채팅 카드 여백 압축 */
+.msg-pair .box-top {
+    padding-bottom: 2px !important;
+}
+
+.msg-pair .box-bottom {
+    padding-top: 2px !important;
+    margin-top: 0 !important;
+}
+
+.msg-pair {
+    padding: 8px 12px !important;
+    margin-bottom: 4px !important;
+}
