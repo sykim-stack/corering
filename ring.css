@@ -29,10 +29,14 @@ main::-webkit-scrollbar { width: 0; }
     color: var(--white);
     font-size: 1.35rem;
     font-weight: 800;
-    margin-bottom: 4px;        /* 6px → 4px */
+    margin-bottom: 4px;
     white-space: pre-wrap;
     line-height: 1.45;
     font-family: 'Be Vietnam Pro', 'Noto Sans KR', sans-serif;
+    display: flex;              /* 추가 */
+    flex-direction: column;     /* 추가 */
+    align-items: flex-start;    /* 추가 */
+    gap: 4px;                   /* 추가: 텍스트-버튼 간격 */
 }
 
 .box-bottom {
