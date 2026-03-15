@@ -485,3 +485,57 @@ function showRoomToast(msg) {
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
 }
+// ─── 닉네임 변경 ─────────────────────────────────────────────
+function changeNickname() {
+    const current = getNickname() || ''
+    const existing = document.getElementById('nickname-modal')
+    if (existing) existing.remove()
+
+    const overlay = document.createElement('div')
+    overlay.id = 'nickname-modal'
+    overlay.style.cssText = `
+        position:fixed; inset:0; background:rgba(0,0,0,0.85);
+        display:flex; align-items:center; justify-content:center;
+        z-index:200; padding:20px;
+    `
+    overlay.innerHTML = `
+        <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px;
+            padding:32px 24px; width:100%; max-width:320px;">
+            <div style="font-size:11px; letter-spacing:3px; color:#555; margin-bottom:16px;">NICKNAME</div>
+            <div style="font-size:18px; font-weight:700; color:#fff; margin-bottom:8px;">닉네임 변경</div>
+            <div style="font-size:12px; color:#444; margin-bottom:20px; font-family:monospace;">현재: ${current || '없음'}</div>
+            <input id="nickname-input" type="text" maxlength="20" placeholder="새 닉네임"
+                value="${current}"
+                style="width:100%; background:#0a0a0a; border:1px solid #333; border-radius:12px;
+                padding:14px 16px; color:#fff; font-size:16px; outline:none;
+                box-sizing:border-box; margin-bottom:16px;"
+            />
+            <button id="nickname-confirm" style="width:100%; background:#fff; border:none;
+                border-radius:16px; padding:16px; color:#000; font-size:16px;
+                font-weight:800; cursor:pointer; margin-bottom:8px;">변경</button>
+            <button onclick="document.getElementById('nickname-modal').remove()" style="
+                width:100%; background:none; border:1px solid #2a2a2a; color:#555;
+                padding:12px; border-radius:16px; font-size:13px; cursor:pointer;">취소</button>
+        </div>
+    `
+    document.body.appendChild(overlay)
+
+    const inp = document.getElementById('nickname-input')
+    const btn = document.getElementById('nickname-confirm')
+    inp.focus()
+    inp.select()
+
+    const confirm = () => {
+        const name = inp.value.trim()
+        if (!name) { inp.style.borderColor = '#a55'; return }
+        saveNickname(name)
+        if (window.currentRoom) window.currentRoom.nickname = name
+        // 헤더 닉네임 표시 즉시 갱신
+        const nicknameBtn = document.getElementById('nickname-display-btn')
+        if (nicknameBtn) nicknameBtn.textContent = '✎ ' + name
+        overlay.remove()
+        showRoomToast('닉네임: ' + name)
+    }
+    btn.onclick    = confirm
+    inp.onkeypress = (e) => { if (e.key === 'Enter') confirm() }
+}
