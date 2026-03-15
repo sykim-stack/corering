@@ -63,14 +63,20 @@ function restoreChat(logs) {
 
         const pairDiv = document.createElement('div');
         pairDiv.className = entry.isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
-        pairDiv.innerHTML = `<div class="box-top">${entry.topHtml}</div><div class="box-bottom">${entry.original}</div>`;
-        history.appendChild(pairDiv);
 
-        const snap = entry;
-        pairDiv.onclick = () => {
-            trackEvent('card_click', { input: snap.original, output: snap.translated, timestamp: Date.now() });
-            showModal(snap.original, snap.translated, snap.isKorean, snap.checkText);
-        };
+        // CHAT 모드 복원: buildChatCard 구조로
+        if (entry.mode === 'CHAT') {
+            pairDiv.innerHTML = `<div class="box-top">${buildChatCard(entry.original, entry.isKorean, null, true)}</div><div class="box-bottom box-bottom-nickname">👤 ${localStorage.getItem('cr_nickname') || '나'}</div>`;
+        } else {
+            pairDiv.innerHTML = `<div class="box-top">${entry.topHtml}</div><div class="box-bottom">${entry.original}</div>`;
+            const snap = entry;
+            pairDiv.onclick = () => {
+                trackEvent('card_click', { input: snap.original, output: snap.translated, timestamp: Date.now() });
+                showModal(snap.original, snap.translated, snap.isKorean, snap.checkText);
+            };
+        }
+
+        history.appendChild(pairDiv);
     });
     history.scrollTop = history.scrollHeight;
 }
@@ -296,24 +302,46 @@ async function translateChatMsg(btn, isKorean) {
 async function sendChatOnly(text, isKorean, isLeft, tempId, pairDiv) {
     const room = window.currentRoom || null;
     if (!room) return;
+
     try {
         const res = await fetch("/api/corechat?action=send-message", {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_id: room.id, nickname: room.nickname, device_id: DEVICE_ID, message: text })
+            body: JSON.stringify({
+                room_id:   room.id,
+                nickname:  room.nickname,
+                device_id: DEVICE_ID,
+                message:   text,
+            })
         });
         const data  = await res.json();
         const msgId = data?.[0]?.id || null;
         if (msgId && typeof sentMsgIds !== 'undefined') sentMsgIds.add(msgId);
 
-        document.getElementById(`t-${tempId}`).innerHTML = buildChatCard(text, isKorean, msgId, true);
+        const cardHtml = buildChatCard(text, isKorean, msgId, true);
+        document.getElementById(`t-${tempId}`).innerHTML = cardHtml;
 
         const bottomEl = document.getElementById(`b-${tempId}`);
         if (bottomEl) {
             bottomEl.textContent = '👤 ' + (room.nickname || localStorage.getItem('cr_nickname') || '나');
             bottomEl.className   = 'box-bottom box-bottom-nickname';
         }
+
         pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
+
+        // ── 화면 저장 추가 ──
+        saveChatLog({
+            original:   text,
+            translated: text,       // CHAT은 번역 없이 원문 저장
+            topHtml:    cardHtml,
+            isKorean,
+            isLeft,
+            checkText:  text,
+            firstLang,
+            mode:       'CHAT',
+            timestamp:  Date.now(),
+        });
+
     } catch(e) {
         document.getElementById(`t-${tempId}`).innerText = '전송 실패';
         console.error('[sendChatOnly]', e);
