@@ -540,3 +540,42 @@ function showRoomToast(msg) {
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
 }
+
+async function translateChatMsg(btn, isKorean) {
+    const boxTop = btn.closest('.box-top');
+    if (!boxTop) return;
+    const textEl = boxTop.querySelector('.chat-card-text');
+    const text   = textEl?.innerText?.trim();
+    if (!text) return;
+
+    btn.textContent = '...';
+    btn.disabled    = true;
+
+    try {
+        const target = isKorean ? 'VI' : 'KO';
+        const res    = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
+        const data   = await res.json();
+        const translated = data.translations?.[0]?.text;
+
+        if (translated) {
+            boxTop.innerHTML = `<div class="chat-translated-text">${translated}</div><div class="chat-original-text">${text}</div>`;
+
+            // ── DB 로그 추가 ──
+            fetch('/api/corechat?action=log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source_locale:     isKorean ? 'ko' : 'vi',
+                    target_locale:     isKorean ? 'vi' : 'ko',
+                    input_text:        text,
+                    output_text:       translated,
+                    engine_used:       'deepl',
+                    conflict_detected: false,
+                })
+            }).catch(() => {});
+        }
+    } catch(e) {
+        btn.textContent = '번역';
+        btn.disabled    = false;
+    }
+}
