@@ -148,13 +148,14 @@ async function handleLog(req, res) {
 // ─────────────────────────────────────────────
 // CREATE ROOM (연쇄: CoreID → 방 → 집)
 // ─────────────────────────────────────────────
+// CHANGE START
 async function handleCreateRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
 
-    const { device_id, room_type = 'dm' } = req.body;
+    const { device_id, room_type = 'dm', room_name = null } = req.body; // ← room_name 추가
     if (!device_id) return res.status(400).json({ error: 'device_id 필수' });
 
-    // ── Step 1: CoreID 확정 (public.core_users) ──
+    // ── Step 1: CoreID 확정 ──
     let coreUser;
     try {
         const { data: existing, error: findErr } = await supabaseService
@@ -174,7 +175,6 @@ async function handleCreateRoom(req, res) {
                 .insert({ core_id: coreId, device_id })
                 .select()
                 .single();
-
             if (createErr) throw new Error('core_users 생성 실패: ' + createErr.message);
             coreUser = created;
         }
@@ -182,16 +182,16 @@ async function handleCreateRoom(req, res) {
         return res.status(500).json({ error: 'Step1 실패', detail: e.message });
     }
 
-    // ── slug 사전 선언 ──
     const slug = 'house_' + Math.random().toString(36).slice(2, 8).toLowerCase();
 
-    // ── Step 2: CoreChat 방 생성 ──
+    // ── Step 2: 방 생성 ──
     let room;
     try {
         const { data, error: roomErr } = await supabaseService
             .from('chat_rooms')
             .insert({
                 room_type,
+                room_name,           // ← 추가
                 owner_device_id: device_id,
                 core_user_id: coreUser.id,
                 is_permanent: true,
@@ -205,7 +205,7 @@ async function handleCreateRoom(req, res) {
         return res.status(500).json({ error: 'Step2 실패', detail: e.message });
     }
 
-    // ── Step 3: CoreNull 집 자동 생성 (실패해도 방은 반환) ──
+    // ── Step 3: CoreNull 집 자동 생성 ──
     let house = null;
     let houseError = null;
     try {
@@ -213,46 +213,34 @@ async function handleCreateRoom(req, res) {
             .schema('corenull')
             .from('houses')
             .insert({
-                slug,
-                name:         slug,
-                core_user_id: coreUser.id,   // ← owner_id 제거
-                house_type:   'family',
-                category:     'daily',
-                is_public:    false,
+                slug, name: slug,
+                core_user_id: coreUser.id,
+                house_type: 'family',
+                category: 'daily',
+                is_public: false,
             })
             .select()
             .single();
 
-        if (houseErr) {
-            console.error('Step3 경고 (집 생성 실패, 무시):', houseErr.message);
-            houseError = houseErr.message;
-        } else {
-            house = data;
-        }
-    } catch (e) {
-        console.error('Step3 예외 (무시):', e.message);
-        houseError = e.message;
-    }
+        if (houseErr) { houseError = houseErr.message; }
+        else { house = data; }
+    } catch (e) { houseError = e.message; }
 
-    // ── Step 4: space_id 연결 (house 있을 때만) ──
+    // ── Step 4: space_id 연결 ──
     if (house) {
         try {
-            await supabaseService
-                .from('chat_rooms')
-                .update({ space_id: house.id })
-                .eq('id', room.id);
-        } catch (e) {
-            console.error('Step4 경고:', e.message);
-        }
+            await supabaseService.from('chat_rooms').update({ space_id: house.id }).eq('id', room.id);
+        } catch (e) { console.error('Step4 경고:', e.message); }
     }
 
     return res.json({
-        room:        { ...room, space_id: house?.id || null },
-        core_user:   coreUser,
-        house:       house ? { id: house.id, slug: house.slug } : null,
+        room: { ...room, space_id: house?.id || null },
+        core_user: coreUser,
+        house: house ? { id: house.id, slug: house.slug } : null,
         house_error: houseError || null,
     });
 }
+// CHANGE END
 
 // ─────────────────────────────────────────────
 // DELETE ROOM

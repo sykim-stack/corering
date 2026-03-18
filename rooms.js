@@ -158,37 +158,39 @@ function renderRoomItems() {
         `
         div.onmouseenter = () => div.style.background = "#111"
         div.onmouseleave = () => div.style.background = isActive ? "#111" : "none"
-        div.innerHTML = `
-            <div style="display:flex; align-items:center; gap:12px;">
-                <div style="
-                    width:36px; height:36px; border-radius:50%;
-                    background:${isActive ? '#1a2a1a' : '#1a1a1a'};
-                    border:1px solid ${isActive ? '#2a4a2a' : '#2a2a2a'};
-                    display:flex; align-items:center; justify-content:center; font-size:14px;
-                ">${isActive ? '🟢' : '💬'}</div>
-                <div>
-                    <div style="font-size:14px; color:#ddd; font-family:monospace; letter-spacing:2px;">
-                        ${room.invite_code}
-                    </div>
-                    <div style="font-size:11px; color:#444; margin-top:2px;">
-                        ${new Date(room.created_at).toLocaleDateString('ko-KR', {month:'short', day:'numeric'})}
-                        ${isOwner ? ' · 방장' : ''}
-                    </div>
-                </div>
-            </div>
-            <div style="display:flex; gap:6px;">
-                <button onclick="event.stopPropagation(); shareInviteCode('${room.invite_code}')" style="
-                    background:none; border:1px solid #2a2a2a; color:#555;
-                    padding:4px 10px; border-radius:12px;
-                    font-size:10px; cursor:pointer; font-family:monospace;
-                ">공유</button>
-                ${isOwner ? `
-                <button onclick="event.stopPropagation(); deleteRoom('${room.id}')" style="
-                    background:none; border:1px solid #3a1a1a; color:#a55;
-                    padding:4px 10px; border-radius:12px;
-                    font-size:10px; cursor:pointer; font-family:monospace;
-                ">삭제</button>` : ''}
-            </div>
+        // CHANGE START
+div.innerHTML = `
+<div style="display:flex; align-items:center; gap:12px;">
+    <div style="
+        width:36px; height:36px; border-radius:50%;
+        background:${isActive ? '#1a2a1a' : '#1a1a1a'};
+        border:1px solid ${isActive ? '#2a4a2a' : '#2a2a2a'};
+        display:flex; align-items:center; justify-content:center; font-size:14px;
+    ">${isActive ? '🟢' : '💬'}</div>
+    <div>
+        <div style="font-size:14px; color:#ddd; font-weight:600;">
+            ${room.room_name || '채팅방'}
+        </div>
+        <div style="font-size:11px; color:#444; margin-top:2px; font-family:monospace; letter-spacing:1px;">
+            ${room.invite_code}${isOwner ? ' · 방장' : ''}
+        </div>
+    </div>
+</div>
+<div style="display:flex; gap:6px;">
+    <button onclick="event.stopPropagation(); shareInviteCode('${room.invite_code}')" style="
+        background:none; border:1px solid #2a2a2a; color:#555;
+        padding:4px 10px; border-radius:12px;
+        font-size:10px; cursor:pointer; font-family:monospace;
+    ">공유</button>
+    ${isOwner ? `
+    <button onclick="event.stopPropagation(); deleteRoom('${room.id}')" style="
+        background:none; border:1px solid #3a1a1a; color:#a55;
+        padding:4px 10px; border-radius:12px;
+        font-size:10px; cursor:pointer; font-family:monospace;
+    ">삭제</button>` : ''}
+</div>
+`
+// CHANGE END
         `
         div.onclick = () => {
             const nickname = getNickname() || '익명'
@@ -317,28 +319,34 @@ function exitChatMode() {
 }
 
 // ─── 방 생성 ─────────────────────────────────────────────────
+// CHANGE START
 async function createNewRoom() {
     const nickname = getNickname()
     const create = async (name) => {
         if (name) saveNickname(name)
+        
+        // 방명 자동 생성: 닉네임 + 날짜
+        const now = new Date()
+        const dateStr = now.toLocaleDateString('ko-KR', {month:'long', day:'numeric'})
+        const roomName = `${name || nickname || '익명'} · ${dateStr}`
+        
         try {
             const res = await fetch("/api/corechat?action=create-room", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ room_type: "dm", device_id: DEVICE_ID })
+                body: JSON.stringify({ 
+                    room_type: "dm", 
+                    device_id: DEVICE_ID,
+                    room_name: roomName  // ← 추가
+                })
             })
             const data = await res.json()
-
-            if (!res.ok) {
-                showRoomToast('방 생성 실패: ' + (data.error || res.status))
-                return
-            }
-
+            if (!res.ok) { showRoomToast('방 생성 실패: ' + (data.error || res.status)); return }
             const room = data.room || data
             if (room?.id) {
                 window.currentRoom = { ...room, nickname: name || nickname || '익명' }
                 lastMsgTimestamp   = new Date().toISOString()
-                setRoomURL(room.invite_code)   // URL 유지
+                setRoomURL(room.invite_code)
                 roomLayer.style.display = 'none'
                 if (typeof switchToChatMode === 'function') switchToChatMode(room)
                 startPolling(room.id)
@@ -354,6 +362,7 @@ async function createNewRoom() {
     if (nickname) await create(nickname)
     else showNicknameModal({ onConfirm: create })
 }
+// CHANGE END
 
 // ─── 방 삭제 ─────────────────────────────────────────────────
 async function deleteRoom(roomId) {
