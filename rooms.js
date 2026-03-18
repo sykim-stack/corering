@@ -191,7 +191,7 @@ div.innerHTML = `
 </div>
 `
 // CHANGE END
-        `
+
         div.onclick = () => {
             const nickname = getNickname() || '익명'
             window.currentRoom = { ...room, nickname }
