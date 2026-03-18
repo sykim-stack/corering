@@ -189,7 +189,7 @@ div.innerHTML = `
         font-size:10px; cursor:pointer; font-family:monospace;
     ">삭제</button>` : ''}
 </div>
-`
+
 // CHANGE END
 
         div.onclick = () => {
