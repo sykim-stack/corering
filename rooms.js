@@ -1,6 +1,5 @@
 // ============================================================
-// BRAINPOOL | CoreRing rooms.js v6.3
-// - 새로고침 시 채팅방 자동 복귀 (URL 유지 방식)
+// BRAINPOOL | CoreRing rooms.js v6.4
 // ============================================================
 
 const roomLayer  = document.getElementById("room-layer")
@@ -71,7 +70,6 @@ window.addEventListener('load', async function autoJoinFromURL() {
     const params = new URLSearchParams(window.location.search)
     const code   = params.get('room')
     if (!code) return
-    // URL 유지 (제거하지 않음 → 새로고침 시 재입장 가능)
 
     await new Promise(r => setTimeout(r, 300))
 
@@ -158,8 +156,7 @@ function renderRoomItems() {
         `
         div.onmouseenter = () => div.style.background = "#111"
         div.onmouseleave = () => div.style.background = isActive ? "#111" : "none"
-        // CHANGE START
-div.innerHTML = `
+        div.innerHTML = `
 <div style="display:flex; align-items:center; gap:12px;">
     <div style="
         width:36px; height:36px; border-radius:50%;
@@ -190,20 +187,19 @@ div.innerHTML = `
     ">삭제</button>` : ''}
 </div>
 `
-// CHANGE END
-
-div.onclick = () => {
-    const nickname = getNickname() || '익명'
-    const roomWithNick = { ...room, nickname }
-
-    stopPolling()                                           // ← 이전 방 폴링 중단
-    window.currentRoom = roomWithNick
-    lastMsgTimestamp   = new Date().toISOString()
-    setRoomURL(room.invite_code)
-    roomLayer.style.display = 'none'
-
-    if (typeof switchToChatMode === 'function') switchToChatMode(roomWithNick)  // ← nickname 포함 객체
-    startPolling(room.id)
+        div.onclick = () => {
+            const nickname     = getNickname() || '익명'
+            const roomWithNick = { ...room, nickname }
+            stopPolling()
+            window.currentRoom = roomWithNick
+            lastMsgTimestamp   = new Date().toISOString()
+            setRoomURL(room.invite_code)
+            roomLayer.style.display = 'none'
+            if (typeof switchToChatMode === 'function') switchToChatMode(roomWithNick)
+            startPolling(room.id)
+        }
+        container.appendChild(div)  // ← 누락됐던 부분
+    })
 }
 
 // ─── 코드 입력 박스 ──────────────────────────────────────────
@@ -267,11 +263,12 @@ async function doJoin(code, nickname) {
         })
         const room = await res.json()
         if (room.id) {
+            stopPolling()
             window.currentRoom = { ...room, nickname: nickname || '익명' }
             lastMsgTimestamp   = new Date().toISOString()
-            setRoomURL(room.invite_code)   // URL 유지
+            setRoomURL(room.invite_code)
             roomLayer.style.display = 'none'
-            if (typeof switchToChatMode === 'function') switchToChatMode(room)
+            if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
             startPolling(room.id)
         } else {
             showRoomToast('존재하지 않는 코드입니다.')
@@ -303,65 +300,53 @@ function startPolling(roomId) {
     }, 3000)
 }
 
-// doJoin 안
-stopPolling()                                               // ← 추가
-window.currentRoom = { ...room, nickname: nickname || '익명' }
-lastMsgTimestamp   = new Date().toISOString()
-setRoomURL(room.invite_code)
-roomLayer.style.display = 'none'
-if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
-
-// createNewRoom 안
-stopPolling()                                               // ← 추가
-window.currentRoom = { ...room, nickname: name || nickname || '익명' }
-lastMsgTimestamp   = new Date().toISOString()
-setRoomURL(room.invite_code)
-roomLayer.style.display = 'none'
-if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
+function stopPolling() {
+    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
+}
 
 // ─── 나가기 ──────────────────────────────────────────────────
 function exitChatMode() {
     stopPolling()
     window.currentRoom = null
+    saveRoomState(null)
     unreadCount = 0
     document.title = 'CoreChat'
-    clearRoomURL()   // URL 초기화
+    clearRoomURL()
     roomLayer.style.display = 'none'
     if (typeof switchToRingMode === 'function') switchToRingMode()
     showRoomToast('번역기로 돌아왔습니다.')
 }
 
 // ─── 방 생성 ─────────────────────────────────────────────────
-// CHANGE START
 async function createNewRoom() {
     const nickname = getNickname()
     const create = async (name) => {
         if (name) saveNickname(name)
-        
-        // 방명 자동 생성: 닉네임 + 날짜
-        const now = new Date()
-        const dateStr = now.toLocaleDateString('ko-KR', {month:'long', day:'numeric'})
+
+        const now     = new Date()
+        const dateStr = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
         const roomName = `${name || nickname || '익명'} · ${dateStr}`
-        
+
         try {
             const res = await fetch("/api/corechat?action=create-room", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    room_type: "dm", 
+                body: JSON.stringify({
+                    room_type: "dm",
                     device_id: DEVICE_ID,
-                    room_name: roomName  // ← 추가
+                    room_name: roomName
                 })
             })
             const data = await res.json()
             if (!res.ok) { showRoomToast('방 생성 실패: ' + (data.error || res.status)); return }
             const room = data.room || data
             if (room?.id) {
+                stopPolling()
                 window.currentRoom = { ...room, nickname: name || nickname || '익명' }
                 lastMsgTimestamp   = new Date().toISOString()
                 setRoomURL(room.invite_code)
                 roomLayer.style.display = 'none'
-                if (typeof switchToChatMode === 'function') switchToChatMode(room)
+                if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
                 startPolling(room.id)
                 shareInviteCode(room.invite_code)
             } else {
@@ -375,7 +360,6 @@ async function createNewRoom() {
     if (nickname) await create(nickname)
     else showNicknameModal({ onConfirm: create })
 }
-// CHANGE END
 
 // ─── 방 삭제 ─────────────────────────────────────────────────
 async function deleteRoom(roomId) {
@@ -416,11 +400,7 @@ function showShareOptions(shareText, code, link) {
     if (existing) existing.remove()
     const modal = document.createElement('div')
     modal.id = 'share-modal'
-    modal.style.cssText = `
-        position:fixed; inset:0; background:rgba(0,0,0,0.85);
-        display:flex; align-items:flex-end; justify-content:center;
-        z-index:300; padding:20px;
-    `
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:flex-end; justify-content:center; z-index:300; padding:20px;'
     const encodedText = encodeURIComponent(shareText)
     modal.innerHTML = `
         <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px; padding:24px;
@@ -458,11 +438,7 @@ function showNicknameModal({ onConfirm }) {
     if (existing) existing.remove()
     const overlay = document.createElement('div')
     overlay.id = 'nickname-modal'
-    overlay.style.cssText = `
-        position:fixed; inset:0; background:rgba(0,0,0,0.85);
-        display:flex; align-items:center; justify-content:center;
-        z-index:200; padding:20px;
-    `
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px;'
     overlay.innerHTML = `
         <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px;
             padding:32px 24px; width:100%; max-width:320px;">
@@ -494,17 +470,13 @@ function showNicknameModal({ onConfirm }) {
 
 // ─── 닉네임 변경 ─────────────────────────────────────────────
 function changeNickname() {
-    const current = getNickname() || ''
+    const current  = getNickname() || ''
     const existing = document.getElementById('nickname-modal')
     if (existing) existing.remove()
 
     const overlay = document.createElement('div')
     overlay.id = 'nickname-modal'
-    overlay.style.cssText = `
-        position:fixed; inset:0; background:rgba(0,0,0,0.85);
-        display:flex; align-items:center; justify-content:center;
-        z-index:200; padding:20px;
-    `
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px;'
     overlay.innerHTML = `
         <div style="background:#111; border:1px solid #2a2a2a; border-radius:24px;
             padding:32px 24px; width:100%; max-width:320px;">
