@@ -554,10 +554,11 @@ function showRoomToast(msg) {
     toast.id = 'room-toast'
     toast.textContent = msg
     toast.style.cssText = `
-        position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-        background:#1a1a1a; color:#aaa; border:1px solid #2a2a2a;
-        padding:10px 20px; border-radius:20px; font-size:12px;
-        font-family:monospace; z-index:9999; white-space:nowrap; letter-spacing:1px;
-    document.body.appendChild(toast)
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#aaa; border:1px solid #2a2a2a;
+    padding:10px 20px; border-radius:20px; font-size:12px;
+    font-family:monospace; z-index:9999; white-space:nowrap; letter-spacing:1px;
+`    // ← 여기 닫는 백틱 없음!
+document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
 }
