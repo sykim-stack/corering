@@ -562,4 +562,3 @@ function showRoomToast(msg) {
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
 }
-
