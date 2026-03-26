@@ -23,28 +23,32 @@ let msgCount      = 0;
 let sessionLogs   = [];
 
 // ─── 날짜별 localStorage 키 ───────────────────────────────────
-function getTodayKey() {
+// ─── 날짜+방별 localStorage 키 ───────────────────────────────
+function getTodayKey(roomId = null) {
     const d    = new Date();
     const yyyy = d.getFullYear();
     const mm   = String(d.getMonth() + 1).padStart(2, '0');
     const dd   = String(d.getDate()).padStart(2, '0');
-    return `chat_log_${yyyy}-${mm}-${dd}`;
+    const base = `chat_log_${yyyy}-${mm}-${dd}`;
+    return roomId ? `${base}_room_${roomId}` : base;
 }
 
 function saveChatLog(entry) {
-    const key  = getTodayKey();
-    const logs = JSON.parse(localStorage.getItem(key) || '[]');
+    const roomId = window.currentRoom?.id || null;
+    const key    = getTodayKey(roomId);
+    const logs   = JSON.parse(localStorage.getItem(key) || '[]');
     logs.push(entry);
     localStorage.setItem(key, JSON.stringify(logs));
 }
 
-function loadTodayChat() {
-    return JSON.parse(localStorage.getItem(getTodayKey()) || '[]');
+function loadTodayChat(roomId = null) {
+    return JSON.parse(localStorage.getItem(getTodayKey(roomId)) || '[]');
 }
 
 function clearTodayChat() {
     if (!confirm('오늘 대화를 삭제할까요?')) return;
-    localStorage.removeItem(getTodayKey());
+    const roomId = window.currentRoom?.id || null;
+    localStorage.removeItem(getTodayKey(roomId));
     history.innerHTML = '';
     msgCount    = 0;
     firstLang   = null;
@@ -172,7 +176,7 @@ function showWelcomeScreen() {
     renderWelcomeCard(preset.vi, preset.ko);
 
     initEngine().then(() => {
-        const savedLogs = loadTodayChat();
+        const savedLogs = loadTodayChat(window.currentRoom?.id || null);
         if (savedLogs.length > 0) {
             const wc = document.getElementById('welcome-card');
             if (wc) wc.remove();
