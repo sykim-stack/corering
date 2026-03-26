@@ -190,6 +190,15 @@ function showWelcomeScreen() {
         if (vi && ko) renderWelcomeCard(vi, ko);
     });
 }
+// ─── 앱 시작 시 room + CHAT 헤더 복원 ────────────────────────
+(function restoreRoomOnLoad() {
+    if (currentMode !== 'CHAT') return;
+    const saved = loadRoomState();
+    if (!saved) return;
+    window.currentRoom = saved;
+    // DOM 준비 후 헤더 복원
+    requestAnimationFrame(() => switchToChatMode(saved));
+})();
 
 showWelcomeScreen();
 
@@ -218,8 +227,21 @@ function showModeToast(mode) {
     setTimeout(() => toast.remove(), 2400);
 }
 
+// ─── Room 상태 저장/복원 헬퍼 ────────────────────────────────
+function saveRoomState(room) {
+    if (room) localStorage.setItem('core_room', JSON.stringify(room));
+    else      localStorage.removeItem('core_room');
+}
+
+function loadRoomState() {
+    try { return JSON.parse(localStorage.getItem('core_room') || 'null'); }
+    catch { return null; }
+}
+
 // ─── CHAT 모드 전환 ───────────────────────────────────────────
 function switchToChatMode(room) {
+    window.currentRoom = room;
+    saveRoomState(room);                              // ← 추가
     currentMode = 'CHAT';
     localStorage.setItem('core_mode', 'CHAT');
     const logoRing = document.querySelector('.logo-ring');
@@ -230,6 +252,19 @@ function switchToChatMode(room) {
     }
     input.placeholder = '메시지 입력...';
     showModeToast('CHAT');
+}
+
+// ─── 나가기 ──────────────────────────────────────────────────
+function exitChatMode() {
+    stopPolling();
+    window.currentRoom = null;
+    saveRoomState(null);                              // ← 추가
+    unreadCount = 0;
+    document.title = 'CoreChat';
+    clearRoomURL();
+    roomLayer.style.display = 'none';
+    if (typeof switchToRingMode === 'function') switchToRingMode();
+    showRoomToast('번역기로 돌아왔습니다.');
 }
 
 // ─── RING 모드 복귀 ──────────────────────────────────────────
