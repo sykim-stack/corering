@@ -248,6 +248,30 @@ function switchToChatMode(room) {
     saveRoomState(room);                              // ← 추가
     currentMode = 'CHAT';
     localStorage.setItem('core_mode', 'CHAT');
+    // ── 방 전환 시 화면 초기화 + 해당 방 로그 복원 ──────────
+    history.innerHTML = '';
+    msgCount    = 0;
+    firstLang   = null;
+    sessionLogs = [];
+
+    const roomLogs = loadTodayChat(room.id);
+    if (roomLogs.length > 0) {
+        restoreChat(roomLogs);
+    } else {
+        showWelcomeScreen();
+    }
+    // ─────────────────────────────────────────────────────────
+
+    const logoRing = document.querySelector('.logo-ring');
+    if (logoRing) logoRing.textContent = 'CHAT';
+    const roomToggle = document.getElementById('room-toggle');
+    if (roomToggle) {
+        roomToggle.outerHTML = `<div id="chat-header-controls"><button id="nickname-display-btn" onclick="changeNickname()">✎ ${room.nickname || getNickname() || '익명'}</button><button id="room-code-btn" onclick="toggleRooms()">● ${room.invite_code}</button><button id="exit-chat-btn" onclick="exitChatMode()">나가기</button></div>`;
+    }
+    input.placeholder = '메시지 입력...';
+    showModeToast('CHAT');
+}
+
     const logoRing = document.querySelector('.logo-ring');
     if (logoRing) logoRing.textContent = 'CHAT';
     const roomToggle = document.getElementById('room-toggle');
