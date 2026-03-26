@@ -245,10 +245,24 @@ function loadRoomState() {
 // ─── CHAT 모드 전환 ───────────────────────────────────────────
 function switchToChatMode(room) {
     window.currentRoom = room;
-    saveRoomState(room);                              // ← 추가
+    saveRoomState(room);
     currentMode = 'CHAT';
     localStorage.setItem('core_mode', 'CHAT');
-    
+
+    // ── 방 전환 시 화면 초기화 + 해당 방 로그 복원 ──────────
+    history.innerHTML = '';
+    msgCount    = 0;
+    firstLang   = null;
+    sessionLogs = [];
+
+    const roomLogs = loadTodayChat(room.id);
+    if (roomLogs.length > 0) {
+        restoreChat(roomLogs);
+    } else {
+        showWelcomeScreen();
+    }
+    // ─────────────────────────────────────────────────────────
+
     const logoRing = document.querySelector('.logo-ring');
     if (logoRing) logoRing.textContent = 'CHAT';
     const roomToggle = document.getElementById('room-toggle');

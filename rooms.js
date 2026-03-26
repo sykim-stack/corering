@@ -192,17 +192,18 @@ div.innerHTML = `
 `
 // CHANGE END
 
-        div.onclick = () => {
-            const nickname = getNickname() || '익명'
-            window.currentRoom = { ...room, nickname }
-            lastMsgTimestamp = new Date().toISOString()
-            setRoomURL(room.invite_code)   // URL 유지
-            roomLayer.style.display = 'none'
-            if (typeof switchToChatMode === 'function') switchToChatMode(room)
-            startPolling(room.id)
-        }
-        container.appendChild(div)
-    })
+div.onclick = () => {
+    const nickname = getNickname() || '익명'
+    const roomWithNick = { ...room, nickname }
+
+    stopPolling()                                           // ← 이전 방 폴링 중단
+    window.currentRoom = roomWithNick
+    lastMsgTimestamp   = new Date().toISOString()
+    setRoomURL(room.invite_code)
+    roomLayer.style.display = 'none'
+
+    if (typeof switchToChatMode === 'function') switchToChatMode(roomWithNick)  // ← nickname 포함 객체
+    startPolling(room.id)
 }
 
 // ─── 코드 입력 박스 ──────────────────────────────────────────
@@ -302,9 +303,21 @@ function startPolling(roomId) {
     }, 3000)
 }
 
-function stopPolling() {
-    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
-}
+// doJoin 안
+stopPolling()                                               // ← 추가
+window.currentRoom = { ...room, nickname: nickname || '익명' }
+lastMsgTimestamp   = new Date().toISOString()
+setRoomURL(room.invite_code)
+roomLayer.style.display = 'none'
+if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
+
+// createNewRoom 안
+stopPolling()                                               // ← 추가
+window.currentRoom = { ...room, nickname: name || nickname || '익명' }
+lastMsgTimestamp   = new Date().toISOString()
+setRoomURL(room.invite_code)
+roomLayer.style.display = 'none'
+if (typeof switchToChatMode === 'function') switchToChatMode(window.currentRoom)
 
 // ─── 나가기 ──────────────────────────────────────────────────
 function exitChatMode() {
