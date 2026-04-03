@@ -298,19 +298,6 @@ function switchToChatMode(room) {
     showModeToast('CHAT');
 }
 
-// ─── 나가기 ──────────────────────────────────────────────────
-function exitChatMode() {
-    stopPolling();
-    window.currentRoom = null;
-    saveRoomState(null);
-    unreadCount = 0;
-    document.title = 'CoreChat';
-    clearRoomURL();
-    roomLayer.style.display = 'none';
-    switchToRingMode();
-    showRoomToast('번역기로 돌아왔습니다.');
-}
-
 // ─── RING 모드 복귀 ──────────────────────────────────────────
 function switchToRingMode() {
     currentMode = 'RING';

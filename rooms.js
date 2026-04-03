@@ -94,9 +94,6 @@ function toggleRooms() {
     }
 }
 
-const initialToggle = document.getElementById('room-toggle')
-if (initialToggle) initialToggle.addEventListener('click', toggleRooms)
-
 // ============================================================
 // VIEW: 방 목록
 // ============================================================
