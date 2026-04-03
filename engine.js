@@ -210,6 +210,7 @@ function updateRoomBar(room) {
     const track = document.getElementById('toggle-track');
     const thumb = document.getElementById('toggle-thumb');
     const chk   = document.getElementById('room-toggle');
+    const logoRing = document.querySelector('.logo-ring'); // 추가
 
     if (!room) {
         bar.style.display   = 'none';
@@ -219,6 +220,7 @@ function updateRoomBar(room) {
         thumb.style.transform  = 'translateX(0)';
         thumb.style.background = '#555';
         chk.checked = false;
+        if (logoRing) logoRing.textContent = 'RING'; // 추가
         return;
     }
     document.getElementById('bar-nickname').textContent  = room.nickname || getNickname() || '익명';
@@ -230,12 +232,14 @@ function updateRoomBar(room) {
     thumb.style.transform   = 'translateX(16px)';
     thumb.style.background  = '#5c9e5c';
     chk.checked = true;
+    if (logoRing) logoRing.textContent = 'CHAT'; // 추가
 }
 
 function copyRoomCode() {
-    const code = document.getElementById('bar-room-code').textContent;
-    navigator.clipboard.writeText(code).catch(() => {});
-    showRoomToast('방 코드 복사됨: ' + code);
+    const code = document.getElementById('bar-room-code').textContent.trim();
+    navigator.clipboard.writeText(code)
+        .then(() => showRoomToast('방 코드 복사됨: ' + code))
+        .catch(() => showRoomToast('복사 실패'));
 }
 
 // ─── 모드 전환 ────────────────────────────────────────────────
