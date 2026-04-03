@@ -1,13 +1,7 @@
-// ============================================================
-// BRAINPOOL | CoreRing logger.js v1.1
-// 번역 로그 저장 - corelink API 호출
-// 변경: intent, intent_conf 컬럼 추가 (v1.1)
-// ============================================================
-
 async function saveTranslationLog({
     inputText, outputText, direction,
     detectedDialect, finalDialect,
-    emotionScore, sessionId, conflictCount,
+    emotionScore, riskScore, sessionId, conflictCount,  // ← riskScore 추가
     intent, intentConf
 }) {
     try {
@@ -22,6 +16,7 @@ async function saveTranslationLog({
                 detected_dialect: detectedDialect,
                 final_dialect:    finalDialect,
                 emotion_score:    emotionScore,
+                risk_score:       riskScore ?? null,    // ← 추가
                 session_id:       sessionId,
                 is_southern:      finalDialect === 'south',
                 conflict_count:   conflictCount,

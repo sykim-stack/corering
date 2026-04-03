@@ -22,7 +22,6 @@ const modal       = document.getElementById('modal-overlay');
 let msgCount      = 0;
 let sessionLogs   = [];
 
-// ─── 날짜별 localStorage 키 ───────────────────────────────────
 // ─── 날짜+방별 localStorage 키 ───────────────────────────────
 function getTodayKey(roomId = null) {
     const d    = new Date();
@@ -354,13 +353,15 @@ async function translateChatMsg(btn, isKorean) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    source_locale:     isKorean ? 'ko' : 'vi',
-                    target_locale:     isKorean ? 'vi' : 'ko',
-                    input_text:        text,
-                    output_text:       translated,
-                    engine_used:       'deepl',
-                    conflict_detected: false,
-                })
+                    source_locale: isKorean ? 'ko' : 'vi',
+                    target_locale: isKorean ? 'vi' : 'ko',
+                    input_text: text, output_text: translated,
+                    engine_used: 'gemini',
+                    emotion_score: normalizeEmotion(calcEmotionScore(text)),  // ← 변경
+                    risk_score: mwFinal?.rrp ?? null,                         // ← 추가
+                    conflict_detected: conflicts.length > 0,
+                    intent: mwFinal.intent, intent_conf: mwFinal.confidence,
+                }),
             }).catch(() => {});
         }
     } catch(e) {
@@ -583,7 +584,9 @@ async function handleSend() {
             inputText: text, outputText: rawTranslation,
             direction: isKorean ? 'KO→VI' : 'VI→KO',
             detectedDialect, finalDialect,
-            emotionScore: mw.rrp, sessionId: SESSION_ID,
+            emotionScore: normalizeEmotion(rawScore),   // ← 변경 (mw.rrp → 감정값)
+            riskScore: mw.rrp,                          // ← 추가
+            sessionId: SESSION_ID,
             conflictCount: conflicts.length, intent: mw.intent, intentConf: mw.confidence,
         });
 
