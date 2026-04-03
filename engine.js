@@ -237,8 +237,9 @@ function updateRoomBar(room) {
 
 function copyRoomCode() {
     const code = document.getElementById('bar-room-code').textContent.trim();
-    navigator.clipboard.writeText(code)
-        .then(() => showRoomToast('방 코드 복사됨: ' + code))
+    const link = `https://corering.vercel.app/?room=${code}`;
+    navigator.clipboard.writeText(link)
+        .then(() => showRoomToast('📋 링크 복사됨!'))
         .catch(() => showRoomToast('복사 실패'));
 }
 
