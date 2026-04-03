@@ -317,8 +317,11 @@ async function handleCorelink(req, res) {
     try {
         const {
             type, input, standard_vi, southern_vi,
-            is_southern, direction, emotion_score,
-            session_id, timestamp, detected_dialect, final_dialect
+            is_southern, direction,
+            emotion_score, risk_score,              // ← risk_score 추가
+            session_id, timestamp,
+            detected_dialect, final_dialect,
+            conflict_count, intent, intent_conf     // ← 추가
         } = req.body;
 
         if (type !== 'translate') return res.status(200).json({ ok: true });
@@ -339,10 +342,14 @@ async function handleCorelink(req, res) {
                     southern_vi:      southern_vi || null,
                     is_southern:      is_southern || false,
                     direction:        direction || null,
-                    emotion_score:    emotion_score || 0,
+                    emotion_score:    emotion_score ?? null,    // ← || 0 → ?? null
+                    risk_score:       risk_score ?? null,       // ← 추가
                     session_id:       session_id || null,
                     detected_dialect: detected_dialect || null,
                     final_dialect:    final_dialect || null,
+                    conflict_count:   conflict_count ?? 0,      // ← 추가
+                    intent:           intent || 'NEUTRAL',      // ← 추가
+                    intent_conf:      intent_conf || 'inferred',// ← 추가
                     keywords:         [],
                     created_at:       timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
                 })
