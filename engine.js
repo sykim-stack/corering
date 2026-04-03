@@ -1,6 +1,6 @@
 // ============================================================
-// BRAINPOOL | CoreRing Engine v3.9
-// inline style → CSS 클래스 분리
+// BRAINPOOL | CoreRing Engine v4.0
+// 토글 스위치 + 하단 room-bar 구조로 전환
 // ============================================================
 
 let CORE_DICTIONARY     = [];
@@ -67,7 +67,6 @@ function restoreChat(logs) {
         const pairDiv = document.createElement('div');
         pairDiv.className = entry.isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
 
-        // CHAT 모드 복원: buildChatCard 구조로
         if (entry.mode === 'CHAT') {
             pairDiv.innerHTML = `<div class="box-top">${buildChatCard(entry.original, entry.isKorean, null, true)}</div><div class="box-bottom box-bottom-nickname">👤 ${localStorage.getItem('cr_nickname') || '나'}</div>`;
         } else {
@@ -78,7 +77,6 @@ function restoreChat(logs) {
                 showModal(snap.original, snap.translated, snap.isKorean, snap.checkText);
             };
         }
-
         history.appendChild(pairDiv);
     });
     history.scrollTop = history.scrollHeight;
@@ -193,17 +191,52 @@ function showWelcomeScreen() {
         if (vi && ko) renderWelcomeCard(vi, ko);
     });
 }
+
 // ─── 앱 시작 시 room + CHAT 헤더 복원 ────────────────────────
 (function restoreRoomOnLoad() {
     if (currentMode !== 'CHAT') return;
     const saved = loadRoomState();
     if (!saved) return;
     window.currentRoom = saved;
-    // DOM 준비 후 헤더 복원
     requestAnimationFrame(() => switchToChatMode(saved));
 })();
 
 showWelcomeScreen();
+
+// ─── 토글 스위치 상태 업데이트 ───────────────────────────────
+function updateRoomBar(room) {
+    const bar   = document.getElementById('room-bar');
+    const label = document.getElementById('toggle-label');
+    const track = document.getElementById('toggle-track');
+    const thumb = document.getElementById('toggle-thumb');
+    const chk   = document.getElementById('room-toggle');
+
+    if (!room) {
+        bar.style.display   = 'none';
+        label.textContent   = 'ROOM';
+        track.style.background = '#222';
+        track.style.borderColor = 'rgba(255,255,255,0.1)';
+        thumb.style.transform  = 'translateX(0)';
+        thumb.style.background = '#555';
+        chk.checked = false;
+        return;
+    }
+    document.getElementById('bar-nickname').textContent  = room.nickname || getNickname() || '익명';
+    document.getElementById('bar-room-code').textContent = room.invite_code || '------';
+    bar.style.display   = 'flex';
+    label.textContent   = 'CHAT';
+    track.style.background  = '#1a2a1a';
+    track.style.borderColor = '#3a6a3a';
+    thumb.style.transform   = 'translateX(16px)';
+    thumb.style.background  = '#5c9e5c';
+    chk.checked = true;
+}
+
+function copyRoomCode() {
+    const code = document.getElementById('bar-room-code').textContent;
+    navigator.clipboard.writeText(code).catch(() => {});
+    showRoomToast('방 코드 복사됨: ' + code);
+}
 
 // ─── 모드 전환 ────────────────────────────────────────────────
 function toggleMode() {
@@ -248,7 +281,6 @@ function switchToChatMode(room) {
     currentMode = 'CHAT';
     localStorage.setItem('core_mode', 'CHAT');
 
-    // ── 방 전환 시 화면 초기화 + 해당 방 로그 복원 ──────────
     history.innerHTML = '';
     msgCount    = 0;
     firstLang   = null;
@@ -260,14 +292,8 @@ function switchToChatMode(room) {
     } else {
         showWelcomeScreen();
     }
-    // ─────────────────────────────────────────────────────────
 
-    const logoRing = document.querySelector('.logo-ring');
-    if (logoRing) logoRing.textContent = 'CHAT';
-    const roomToggle = document.getElementById('room-toggle');
-    if (roomToggle) {
-        roomToggle.outerHTML = `<div id="chat-header-controls"><button id="nickname-display-btn" onclick="changeNickname()">✎ ${room.nickname || getNickname() || '익명'}</button><button id="room-code-btn" onclick="toggleRooms()">● ${room.invite_code}</button><button id="exit-chat-btn" onclick="exitChatMode()">나가기</button></div>`;
-    }
+    updateRoomBar(room);                         // ← 헤더 innerHTML 교체 제거
     input.placeholder = '메시지 입력...';
     showModeToast('CHAT');
 }
@@ -276,12 +302,12 @@ function switchToChatMode(room) {
 function exitChatMode() {
     stopPolling();
     window.currentRoom = null;
-    saveRoomState(null);                              // ← 추가
+    saveRoomState(null);
     unreadCount = 0;
     document.title = 'CoreChat';
     clearRoomURL();
     roomLayer.style.display = 'none';
-    if (typeof switchToRingMode === 'function') switchToRingMode();
+    switchToRingMode();
     showRoomToast('번역기로 돌아왔습니다.');
 }
 
@@ -289,14 +315,7 @@ function exitChatMode() {
 function switchToRingMode() {
     currentMode = 'RING';
     localStorage.setItem('core_mode', 'RING');
-    const logoRing = document.querySelector('.logo-ring');
-    if (logoRing) logoRing.textContent = 'RING';
-    const chatControls = document.getElementById('chat-header-controls');
-    if (chatControls) {
-        chatControls.outerHTML = `<button id="room-toggle">ROOM</button>`;
-        const newToggle = document.getElementById('room-toggle');
-        if (newToggle) newToggle.addEventListener('click', toggleRooms);
-    }
+    updateRoomBar(null);                         // ← outerHTML 복원 제거
     input.placeholder = '심장을 분석합니다...';
     showModeToast('RING');
 }
@@ -312,6 +331,12 @@ input.addEventListener('input', () => {
     input.value.length > 0
         ? header.classList.add('glow-active')
         : header.classList.remove('glow-active');
+});
+
+// ─── 토글 이벤트 ─────────────────────────────────────────────
+document.getElementById('room-toggle').addEventListener('change', function() {
+    if (this.checked) toggleRooms();
+    else exitChatMode();
 });
 
 function buildIntentBadge(intent) {
@@ -348,20 +373,18 @@ async function translateChatMsg(btn, isKorean) {
         if (translated) {
             boxTop.innerHTML = `<div class="chat-translated-text">${translated}</div><div class="chat-original-text">${text}</div>`;
 
-            // ── DB 로그 추가 ──
             fetch('/api/corechat?action=log', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    source_locale: isKorean ? 'ko' : 'vi',
-                    target_locale: isKorean ? 'vi' : 'ko',
-                    input_text: text, output_text: translated,
-                    engine_used: 'gemini',
-                    emotion_score: normalizeEmotion(calcEmotionScore(text)),  // ← 변경
-                    risk_score: mwFinal?.rrp ?? null,                         // ← 추가
-                    conflict_detected: conflicts.length > 0,
-                    intent: mwFinal.intent, intent_conf: mwFinal.confidence,
-                }),
+                    source_locale:     isKorean ? 'ko' : 'vi',
+                    target_locale:     isKorean ? 'vi' : 'ko',
+                    input_text:        text,
+                    output_text:       translated,
+                    engine_used:       'deepl',
+                    emotion_score:     normalizeEmotion(calcEmotionScore(text)),
+                    conflict_detected: false,
+                })
             }).catch(() => {});
         }
     } catch(e) {
@@ -401,17 +424,10 @@ async function sendChatOnly(text, isKorean, isLeft, tempId, pairDiv) {
 
         pairDiv.className = isLeft ? 'msg-pair pair-left' : 'msg-pair pair-right';
 
-        // ── 화면 저장 추가 ──
         saveChatLog({
-            original:   text,
-            translated: text,       // CHAT은 번역 없이 원문 저장
-            topHtml:    cardHtml,
-            isKorean,
-            isLeft,
-            checkText:  text,
-            firstLang,
-            mode:       'CHAT',
-            timestamp:  Date.now(),
+            original: text, translated: text,
+            topHtml: cardHtml, isKorean, isLeft,
+            checkText: text, firstLang, mode: 'CHAT', timestamp: Date.now(),
         });
 
     } catch(e) {
@@ -477,10 +493,16 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                source_locale: isKorean ? 'ko' : 'vi', target_locale: isKorean ? 'vi' : 'ko',
-                input_text: text, output_text: translated, engine_used: 'gemini',
-                emotion_score: mwFinal?.rrp ?? null, conflict_detected: conflicts.length > 0,
-                intent: mwFinal.intent, intent_conf: mwFinal.confidence,
+                source_locale:     isKorean ? 'ko' : 'vi',
+                target_locale:     isKorean ? 'vi' : 'ko',
+                input_text:        text,
+                output_text:       translated,
+                engine_used:       'gemini',
+                emotion_score:     normalizeEmotion(calcEmotionScore(text)),  // ← 수정
+                risk_score:        mwFinal?.rrp ?? null,                      // ← 추가
+                conflict_detected: conflicts.length > 0,
+                intent:            mwFinal.intent,
+                intent_conf:       mwFinal.confidence,
             }),
         }).catch(() => {});
 
@@ -584,9 +606,9 @@ async function handleSend() {
             inputText: text, outputText: rawTranslation,
             direction: isKorean ? 'KO→VI' : 'VI→KO',
             detectedDialect, finalDialect,
-            emotionScore: normalizeEmotion(rawScore),   // ← 변경 (mw.rrp → 감정값)
-            riskScore: mw.rrp,                          // ← 추가
-            sessionId: SESSION_ID,
+            emotionScore: normalizeEmotion(rawScore),
+            riskScore:    mw.rrp,
+            sessionId:    SESSION_ID,
             conflictCount: conflicts.length, intent: mw.intent, intentConf: mw.confidence,
         });
 
