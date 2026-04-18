@@ -1,138 +1,554 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CORE-RING ENGINE</title>
-    <meta property="og:title" content="한↔베 방언 번역기 · CoreRing">
-    <meta property="og:description" content="한국어 ↔ 베트남어, 사투리까지 번역돼요 🗣️ 남북 방언 자동 감지 · 감정 톤 분석">
-    <meta property="og:url" content="https://corering.vercel.app">
-    <meta property="og:type" content="website">
-    <meta property="og:image" content="https://corering.vercel.app/icon-512.png">
-    <link rel="stylesheet" href="common.css">
-    <link rel="stylesheet" href="ring.css">
-    <link rel="stylesheet" href="chat.css">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0a0a0a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="CORERING">
-    <style>
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
-            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        #install-btn {
-            background: none; border: none;
-            cursor: pointer; color: currentColor;
-            padding: 0 20px; display: flex; align-items: center;
-        }
-        #install-btn.pwa-ready svg { stroke: #f0b429; }
-        #room-bar {
-            position: sticky;
-            bottom: 0;
-            z-index: 10;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>CORE-RING ENGINE · 향상된 버전</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── 변수: THE BLACK IDENTITY (CoreRing 색상 시스템) ─────────────────────────────────── */
+    :root {
+      --bg: #0A0A0A;
+      --surface: #1A1A1A;
+      --glass: rgba(255, 255, 255, 0.05);
+      --accent: #F2C4A0;
+      --text: #FDF8F3;
+      --muted: #888888;
+      --border: rgba(255, 255, 255, 0.1);
+      --success: #8FBFAB;
+      --warning: #F2C4A0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Serif KR', serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── 애니메이션 ──────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes barcodeScan {
+      0%, 100% {
+        opacity: 0.3;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
+    /* ── 헤더 (상단) ──────────────────────────────────────────────── */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 100;
+    }
+
+    .header-logo {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--accent);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .header-btn {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .header-btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    /* ── 메인 콘텐츠 ──────────────────────────────────────────────── */
+    .main {
+      padding-top: 56px;
+      padding-bottom: 120px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── 바코드 배경 애니메이션 ──────────────────────────────────────────────── */
+    .barcode-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.05;
+    }
+
+    .barcode-line {
+      position: absolute;
+      background: var(--accent);
+      animation: barcodeScan 3s ease-in-out infinite;
+    }
+
+    .barcode-line:nth-child(1) {
+      width: 2px;
+      height: 100px;
+      left: 10%;
+      top: 20%;
+    }
+
+    .barcode-line:nth-child(2) {
+      width: 3px;
+      height: 80px;
+      left: 20%;
+      top: 40%;
+      animation-delay: 0.3s;
+    }
+
+    .barcode-line:nth-child(3) {
+      width: 2px;
+      height: 90px;
+      left: 30%;
+      top: 30%;
+      animation-delay: 0.6s;
+    }
+
+    /* ── 카드 레이아웃 ──────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      max-width: 480px;
+      width: 90%;
+      animation: fadeUp 0.6s ease both;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    /* ── 입력 영역 ──────────────────────────────────────────────── */
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .input-field {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-family: 'Noto Serif KR', serif;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+      background: rgba(242, 196, 160, 0.05);
+    }
+
+    .input-field::placeholder {
+      color: var(--muted);
+    }
+
+    .send-btn {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 12px;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(242, 196, 160, 0.3);
+    }
+
+    .send-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* ── 태그 그룹 ──────────────────────────────────────────────── */
+    .tag-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .tag {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tag:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    .tag.active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    /* ── 하단 네비게이션 (Bottom Navigation) ──────────────────────────────────────────────── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-start;
+      padding: 8px 0 16px 0;
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      padding: 8px;
+      border-radius: 12px;
+    }
+
+    .nav-item:hover {
+      background: var(--glass);
+    }
+
+    .nav-icon {
+      font-size: 24px;
+    }
+
+    .nav-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    .nav-item.active .nav-label {
+      color: var(--accent);
+    }
+
+    /* ── 플로팅 액션 버튼 (FAB) ──────────────────────────────────────────────── */
+    .fab {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 0 30px rgba(242, 196, 160, 0.3);
+      transition: all 0.3s;
+      z-index: 99;
+    }
+
+    .fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 40px rgba(242, 196, 160, 0.5);
+    }
+
+    .fab:active {
+      transform: scale(0.95);
+    }
+
+    /* ── 모달 ──────────────────────────────────────────────── */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: flex-end;
+      z-index: 1000;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      width: 100%;
+      max-width: 480px;
+      padding: 24px;
+      animation: slideUp 0.3s ease both;
+    }
+
+    .modal-handle {
+      height: 4px;
+      width: 40px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    /* ── 반응형 디자인 ──────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .card {
+        max-width: 100%;
+        margin: 0 12px;
+      }
+
+      .header {
+        height: 48px;
+        padding: 0 12px;
+      }
+
+      .main {
+        padding-bottom: 100px;
+      }
+    }
+
+    /* ── 제스처 피드백 ──────────────────────────────────────────────── */
+    @supports (padding: max(0px)) {
+      .bottom-nav {
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+      }
+    }
+  </style>
 </head>
 <body>
-    <header id="header">
-        <div class="header-top">
-            <div class="logo-area">
-                <a href="/" style="text-decoration:none;">
-                    <span class="logo-core">CORE</span><span class="logo-ring">RING</span>
-                </a>
-            </div>
-            <div style="display:flex; align-items:center; gap:14px;">
+  <!-- 헤더 -->
+  <header class="header">
+    <div class="header-logo">CORERING</div>
+    <div class="header-actions">
+      <button class="header-btn" title="설정">⚙️</button>
+      <button class="header-btn" title="공유">📤</button>
+    </div>
+  </header>
 
-                <!-- ROOM 토글 스위치 -->
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <span id="toggle-label" style="font-size:9px; color:#555; letter-spacing:1.5px; font-family:monospace;">ROOM</span>
-                    <label style="position:relative; width:36px; height:20px; cursor:pointer; display:block;">
-                        <input type="checkbox" id="room-toggle" style="opacity:0; position:absolute; width:0; height:0;">
-                        <div id="toggle-track" style="position:absolute; inset:0; background:#222; border-radius:20px; border:0.5px solid rgba(255,255,255,0.1); transition:background 0.25s, border-color 0.25s;"></div>
-                        <div id="toggle-thumb" style="position:absolute; top:3px; left:3px; width:14px; height:14px; background:#555; border-radius:50%; transition:transform 0.25s, background 0.25s; pointer-events:none;"></div>
-                    </label>
-                </div>
-
-                <!-- 대화 삭제 -->
-                <button id="clear-btn" aria-label="대화 삭제" style="background:none; border:none; cursor:pointer; color:#555; padding:0; display:flex; align-items:center; transition:color 0.2s;">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                        <path d="M10 11v6M14 11v6"></path>
-                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                    </svg>
-                </button>
-
-                <!-- 홈 화면 추가 -->
-                <button id="install-btn" aria-label="홈 화면에 추가">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path d="M12 2v13M7 10l5 5 5-5"/>
-                        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
-                    </svg>
-                </button>
-
-                <!-- 공유 -->
-                <button id="share-btn" style="background:none; border:none; cursor:pointer; color:currentColor; padding:0; display:flex; align-items:center;" aria-label="공유">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                </button>
-
-            </div>
-        </div>
-        <div class="morse-r" id="morse-logo">
-            <div class="m-dot"></div><div class="m-dash"></div><div class="m-dot"></div>
-        </div>
-    </header>
-
-    <main id="chat-history"></main>
-
-    <!-- Chat Room Layer -->
-    <div id="room-layer" style="position:fixed; top:60px; left:0; right:0; bottom:70px; background:#0a0a0a; display:none; overflow-y:auto; z-index:50;">
-        <div id="room-list" style="padding:20px;"></div>
+  <!-- 메인 콘텐츠 -->
+  <main class="main">
+    <!-- 바코드 배경 애니메이션 -->
+    <div class="barcode-bg">
+      <div class="barcode-line"></div>
+      <div class="barcode-line"></div>
+      <div class="barcode-line"></div>
     </div>
 
-    <!-- 하단 ROOM BAR (CHAT 모드 시만 노출) -->
-    <div id="room-bar" style="display:none; background:#0f0f0f; border-top:0.5px solid rgba(255,255,255,0.06); padding:8px 16px; align-items:center; justify-content:space-between;">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <button id="nickname-display-btn" onclick="changeNickname()" style="background:none; border:none; cursor:pointer; color:#888; font-family:monospace; font-size:11px; padding:0;">✎ <span id="bar-nickname">익명</span></button>
-            <button id="room-code-btn" onclick="copyRoomCode()" style="background:#1a2a1a; border:0.5px solid #2a3a2a; border-radius:10px; color:#5c9e5c; font-family:monospace; font-size:11px; padding:2px 8px; cursor:pointer;">● <span id="bar-room-code">------</span></button>
-        </div>
-        <button id="exit-chat-btn" onclick="exitChatMode()" style="background:none; border:none; cursor:pointer; color:#444; display:flex; align-items:center; transition:color 0.2s;" title="나가기">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-        </button>
+    <!-- 카드 -->
+    <div class="card">
+      <div class="card-title">quản lý</div>
+      <div class="card-subtitle">에너지</div>
+
+      <!-- 태그 그룹 -->
+      <div class="tag-group">
+        <span class="tag active">🏙️ 북부</span>
+        <span class="tag">🌴 남부</span>
+        <span class="tag">📚 학습</span>
+      </div>
+
+      <!-- 입력 영역 -->
+      <div class="input-group">
+        <input type="text" class="input-field" placeholder="심장을 분석합니다..." />
+        <button class="send-btn">🔍</button>
+      </div>
+
+      <div style="font-size: 12px; color: var(--muted); text-align: center;">
+        💡 팁: 길게 눌러 북마크하거나 스와이프로 이전 기록을 확인하세요
+      </div>
     </div>
+  </main>
 
-    <div id="modal-overlay" class="modal-overlay">
-        <div class="modal-content">
-            <div id="modal-body"></div>
-            <button id="modal-close">확인</button>
-        </div>
+  <!-- 플로팅 액션 버튼 -->
+  <div class="fab" onclick="openModal('recordModal')">🎤</div>
+
+  <!-- 하단 네비게이션 -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchNav(this, 'translate')">
+      <div class="nav-icon">🌐</div>
+      <div class="nav-label">번역</div>
     </div>
+    <div class="nav-item" onclick="switchNav(this, 'history')">
+      <div class="nav-icon">📜</div>
+      <div class="nav-label">기록</div>
+    </div>
+    <div class="nav-item" onclick="switchNav(this, 'bookmark')">
+      <div class="nav-icon">🔖</div>
+      <div class="nav-label">북마크</div>
+    </div>
+    <div class="nav-item" onclick="switchNav(this, 'community')">
+      <div class="nav-icon">👥</div>
+      <div class="nav-label">커뮤니티</div>
+    </div>
+  </nav>
 
-    <footer>
-        <input type="text" id="userInput" class="input-box" placeholder="심장을 분석합니다..." autocomplete="off">
-        <button id="send-btn" class="btn-send">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </button>
-    </footer>
+  <!-- 음성 입력 모달 -->
+  <div class="modal" id="recordModal" onclick="closeModal(this)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-title">🎤 음성 입력</div>
+      <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">
+        베트남어 성조를 정확하게 인식합니다
+      </p>
+      <button style="width: 100%; background: var(--accent); color: var(--bg); border: none; border-radius: 12px; padding: 12px; font-size: 14px; cursor: pointer; font-weight: 600;">
+        🎙️ 녹음 시작
+      </button>
+    </div>
+  </div>
 
-    <script src="dialect.js"></script>
-    <script src="conflict.js"></script>
-    <script src="logger.js"></script>
-    <script src="mindworld.js"></script>
-    <script src="rooms.js"></script>
-    <script src="engine.js"></script>
-    <script src="pipeline.js"></script>
-    <script src="share.js"></script>
-    <script src="install.js"></script>
-    <script src="locale-setup.js"></script>
+  <script>
+    function switchNav(el, section) {
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      el.classList.add('active');
+      console.log(`Switched to: ${section}`);
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
+    }
+
+    function closeModal(el) {
+      el.classList.remove('open');
+    }
+
+    // 제스처 제어 (스와이프)
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          console.log('Swiped left - next');
+        } else {
+          console.log('Swiped right - previous');
+        }
+      }
+    });
+
+    // 길게 눌러 북마크
+    let longPressTimer;
+    document.addEventListener('touchstart', (e) => {
+      longPressTimer = setTimeout(() => {
+        console.log('Long pressed - bookmark');
+      }, 500);
+    });
+
+    document.addEventListener('touchend', () => {
+      clearTimeout(longPressTimer);
+    });
+  </script>
 </body>
 </html>
