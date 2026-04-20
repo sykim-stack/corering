@@ -78,9 +78,12 @@ async function handleTranslate(req, res) {
         const data = await response.json();
         return res.status(200).json({ ...data, source: 'deepl' });
     } catch (error) {
-        return res.status(500).json({ error: 'DeepL 통신 실패' });
+        return res.status(200).json({ 
+            translations: [{ text: text }],  // 실패 시 원문 그대로 반환
+            source: 'fallback',
+            error: error.message
+        });
     }
-}
 
 // ─────────────────────────────────────────────
 // PIPELINE

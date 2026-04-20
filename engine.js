@@ -459,7 +459,7 @@ async function handleChatMode(text, mw, tempId, pairDiv, isKorean, isLeft) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '번역 오류');
 
-        const translated = data.translated;
+        const translated = data.translations?.[0]?.text;
         const checkText  = isKorean ? translated : text;
         const conflicts  = detectConflicts(checkText, CONFLICT_DICTIONARY);
         const mwFinal    = runMindWorld({ rawScore: calcEmotionScore(text), inputText: text, sessionLogs, conflicts });
@@ -549,10 +549,17 @@ async function handleSend() {
 
     // ── RING 모드 ──
     try {
-        const target         = isKorean ? 'VI' : 'KO';
-        const res            = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
-        const data           = await res.json();
-        const rawTranslation = data.translations[0].text;
+        const target = isKorean ? 'VI' : 'KO';
+        const res  = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
+        const data = await res.json();
+        
+        // ← 여기가 핵심 수정
+        const rawTranslation = data?.translations?.[0]?.text;
+        if (!rawTranslation) {
+            document.getElementById(`t-${tempId}`).innerText = '번역 오류';
+            console.warn('[RING] translate 실패:', data);
+            return;
+        }
 
         if (typeof sendTranslationToRoom === 'function') {
             sendTranslationToRoom(text, rawTranslation, isKorean ? 'KO→VI' : 'VI→KO');
