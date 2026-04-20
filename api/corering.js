@@ -36,6 +36,7 @@ async function handleTranslate(req, res) {
 
     if (isSingleWord) {
         try {
+            const supabase = getSupabase();
             if (target === 'KO') {
                 const { data: rows } = await supabase
                     .from('tp_translations')
@@ -80,12 +81,13 @@ async function handleTranslate(req, res) {
         const data = await response.json();
         return res.status(200).json({ ...data, source: 'deepl' });
     } catch (error) {
-        return res.status(200).json({ 
-            translations: [{ text: text }],  // 실패 시 원문 그대로 반환
+        return res.status(200).json({
+            translations: [{ text: text }],
             source: 'fallback',
             error: error.message
         });
     }
+}
 
 // ─────────────────────────────────────────────
 // PIPELINE
@@ -102,6 +104,7 @@ async function handlePipeline(req, res) {
         return res.status(400).json({ error: 'meaning_ko 길이 오류' });
 
     try {
+        const supabase = getSupabase();
         const { data, error } = await supabase.rpc('approve_translation', {
             p_standard_word: standard_word.trim(),
             p_meaning_ko:    meaning_ko.trim(),
@@ -233,6 +236,7 @@ ${wordList}
 }
 
 async function processBatch(batch) {
+    const supabase = getSupabase();
     const words = batch.map(r => r.standard_word);
 
     let southernWords;
@@ -265,6 +269,7 @@ async function handleSouthernFill(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
+        const supabase = getSupabase();
         const { data: rows, error: fetchErr } = await supabase
             .from('tp_translations')
             .select('id, standard_word, southern_word')
@@ -323,10 +328,10 @@ async function handleCorelink(req, res) {
         const {
             type, input, standard_vi, southern_vi,
             is_southern, direction,
-            emotion_score, risk_score,              // ← risk_score 추가
+            emotion_score, risk_score,
             session_id, timestamp,
             detected_dialect, final_dialect,
-            conflict_count, intent, intent_conf     // ← 추가
+            conflict_count, intent, intent_conf
         } = req.body;
 
         if (type !== 'translate') return res.status(200).json({ ok: true });
@@ -347,14 +352,14 @@ async function handleCorelink(req, res) {
                     southern_vi:      southern_vi || null,
                     is_southern:      is_southern || false,
                     direction:        direction || null,
-                    emotion_score:    emotion_score ?? null,    // ← || 0 → ?? null
-                    risk_score:       risk_score ?? null,       // ← 추가
+                    emotion_score:    emotion_score ?? null,
+                    risk_score:       risk_score ?? null,
                     session_id:       session_id || null,
                     detected_dialect: detected_dialect || null,
                     final_dialect:    final_dialect || null,
-                    conflict_count:   conflict_count ?? 0,      // ← 추가
-                    intent:           intent || 'NEUTRAL',      // ← 추가
-                    intent_conf:      intent_conf || 'inferred',// ← 추가
+                    conflict_count:   conflict_count ?? 0,
+                    intent:           intent || 'NEUTRAL',
+                    intent_conf:      intent_conf || 'inferred',
                     keywords:         [],
                     created_at:       timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
                 })
@@ -390,4 +395,4 @@ module.exports = async function handler(req, res) {
         default:
             return res.status(400).json({ error: 'action 파라미터 필요 (translate | pipeline | get-conflicts | get-dictionary | southern-fill | corelink)' });
     }
-}
+};
