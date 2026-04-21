@@ -590,7 +590,27 @@ async function handleSend() {
 
         sessionLogs.push({ input: text, output: rawTranslation, rawScore, timestamp: Date.now() });
 
-        let topHtml = rawTranslation;
+        // 🔥 업그레이드된 카드 생성
+let topHtml = buildEnhancedCard({
+    original: text,
+    translated: rawTranslation,
+    mw,
+});
+
+// 기존 뱃지 유지
+if (conflicts.length > 0) {
+    topHtml += conflicts.some(c => c.severity === 'high')
+        ? ' <span class="conflict-badge">🔴 방언 주의</span>'
+        : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+}
+
+if (mw.level === 'HIGH') {
+    topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
+} else if (mw.level === 'MEDIUM') {
+    topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
+}
+
+topHtml += buildIntentBadge(mw.intent);
         if (conflicts.length > 0) {
             topHtml += conflicts.some(c => c.severity === 'high')
                 ? ' <span class="conflict-badge">🔴 방언 주의</span>'
@@ -674,6 +694,20 @@ function showModal(original, translated, isKorean, cardText) {
 
     const sentenceCard = `<div class="chunk-card sentence-unit"><div class="chunk-header"><span class="chunk-v">${translated}</span></div><span class="chunk-k">${original}</span></div>`;
 
+    const rawScore = calcEmotionScore(original);
+const mw = runMindWorld({
+    rawScore,
+    inputText: original,
+    sessionLogs,
+    conflicts: []
+});
+
+const toneInfo = `
+<div style="font-size:12px; opacity:0.7; margin-top:6px;">
+🧠 상태: ${mw.intentState} (${mw.rrp.toFixed(2)})
+</div>
+`;
+
     words.forEach(word => {
         const cleanWord = word.replace(/[.,!?]/g, '');
         if (!cleanWord) return;
@@ -695,8 +729,30 @@ function showModal(original, translated, isKorean, cardText) {
 
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
-    document.getElementById('modal-body').innerHTML = `<div class="modal-sentence-area">${sentenceCard}</div><div class="modal-divider"></div><div class="chunk-grid">${chunkHtml}</div>`;
-    modal.style.display = 'flex';
+    const rawScore = calcEmotionScore(original);
+const mw = runMindWorld({
+    rawScore,
+    inputText: original,
+    sessionLogs,
+    conflicts: []
+});
+
+const toneInfo = `
+<div style="font-size:12px; opacity:0.7; margin-top:6px;">
+    🧠 상태: ${mw.intentState} (${mw.rrp.toFixed(2)})
+</div>
+`;
+
+document.getElementById('modal-body').innerHTML = `
+    <div class="modal-sentence-area">
+        ${sentenceCard}
+        ${toneInfo}
+    </div>
+    <div class="modal-divider"></div>
+    <div class="chunk-grid">${chunkHtml}</div>
+`;
+
+modal.style.display = 'flex';
 }
 
 // ─── 이벤트 핸들러 ────────────────────────────────────────────
@@ -723,3 +779,39 @@ document.addEventListener('click', (e) => {
         });
     }
 });
+
+function buildEnhancedCard({ original, translated, mw }) {
+
+    // 사전 기반 북/남 추출
+    const found = DICT_MAP.get(translated?.toLowerCase());
+
+    const north = found?.standard || found?.standard_word || null;
+    const south = found?.southern || found?.southern_word || null;
+
+    const hasDiff = north && south && north !== south;
+
+    // 감정 상태
+    let tone = '🧠 안정';
+    if (mw?.rrp > 0.7) tone = '🔴 갈등';
+    else if (mw?.rrp > 0.4) tone = '🟡 긴장';
+
+    return `
+        <div style="line-height:1.4">
+            
+            <div style="font-size:16px; font-weight:600;">
+                ${translated}
+            </div>
+
+            ${hasDiff ? `
+            <div style="font-size:12px; opacity:0.8; margin-top:4px;">
+                🇻🇳 북부: ${north} · 남부: ${south}
+            </div>
+            ` : ''}
+
+            <div style="font-size:11px; opacity:0.6; margin-top:4px;">
+                ${tone} · ${mw.intentState}
+            </div>
+
+        </div>
+    `;
+}
