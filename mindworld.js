@@ -112,7 +112,7 @@ export function analyzeIntent({
 // ─────────────────────────────────────────
 // 🔥 통합 실행 함수 (핵심)
 // ─────────────────────────────────────────
-export function runMindWorld({ rawScore = 0, inputText = '', sessionLogs = [], conflicts = [] }) {
+    function runMindWorld({ rawScore = 0, inputText = '', sessionLogs = [], conflicts = [] }) {
 
     // 1️⃣ 감정 정규화
     const normalized = normalizeEmotion(rawScore);
