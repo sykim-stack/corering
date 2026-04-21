@@ -766,14 +766,7 @@ function showModal(original, translated, isKorean, cardText) {
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
     // ✅ 최종 렌더 (한 번만)
-    document.getElementById('modal-body').innerHTML = `
-        <div class="modal-sentence-area">
-            ${sentenceCard}
-            ${toneInfo}
-        </div>
-        <div class="modal-divider"></div>
-        <div class="chunk-grid">${chunkHtml}</div>
-    `;
+    document.getElementById('modal-body').innerHTML = `<div class="modal-sentence-area">${toneInfo}</div><div class="modal-divider"></div><div class="chunk-grid">${chunkHtml}</div>`;
 
     modal.style.display = 'flex';
 }
