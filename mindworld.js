@@ -7,14 +7,14 @@
 // ─────────────────────────────────────────
 // 감정 정규화 (0~10 → 0~1)
 // ─────────────────────────────────────────
-export function normalizeEmotion(rawScore = 0) {
+    function normalizeEmotion(rawScore = 0) {
     return Math.max(0, Math.min(1, rawScore / 10));
 }
 
 // ─────────────────────────────────────────
 // CAS (관계 누적 감정)
 // ─────────────────────────────────────────
-export function calculateCAS(scores = []) {
+    function calculateCAS(scores = []) {
     if (!scores.length) return 0;
 
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -26,7 +26,7 @@ export function calculateCAS(scores = []) {
 // ─────────────────────────────────────────
 // RRP (관계 리스크)
 // ─────────────────────────────────────────
-export function calculateRRP({ cas = 0, normalized = 0 }) {
+    function calculateRRP({ cas = 0, normalized = 0 }) {
     const weightCAS = 0.6;
     const weightEmotion = 0.4;
 
@@ -38,7 +38,7 @@ export function calculateRRP({ cas = 0, normalized = 0 }) {
 // ─────────────────────────────────────────
 // 역할 추정
 // ─────────────────────────────────────────
-export function detectRole(sessionLogs = []) {
+    function detectRole(sessionLogs = []) {
     if (!sessionLogs.length) return 'neutral';
 
     const last = sessionLogs[sessionLogs.length - 1];
@@ -53,7 +53,7 @@ export function detectRole(sessionLogs = []) {
 // ─────────────────────────────────────────
 // 갈등 감지
 // ─────────────────────────────────────────
-export function detectConflict(text = '') {
+    function detectConflict(text = '') {
     const keywords = ['왜', '짜증', '싫어', '그만', '하지마', '됐어'];
 
     return keywords.some(k => text.includes(k));
@@ -62,7 +62,7 @@ export function detectConflict(text = '') {
 // ─────────────────────────────────────────
 // 상태 전이 (Intent State)
 // ─────────────────────────────────────────
-export function nextIntentState({ currentState = 'CALM', hasConflict = false, normalized = 0 }) {
+    function nextIntentState({ currentState = 'CALM', hasConflict = false, normalized = 0 }) {
 
     if (normalized > 0.7) return 'ESCALATED';
     if (hasConflict && normalized > 0.4) return 'TENSE';
@@ -74,7 +74,7 @@ export function nextIntentState({ currentState = 'CALM', hasConflict = false, no
 // ─────────────────────────────────────────
 // 위험도 평가
 // ─────────────────────────────────────────
-export function evaluateRisk({ rrp = 0, intentState = 'CALM' }) {
+    function evaluateRisk({ rrp = 0, intentState = 'CALM' }) {
 
     let level = 'LOW';
 
@@ -87,7 +87,7 @@ export function evaluateRisk({ rrp = 0, intentState = 'CALM' }) {
 // ─────────────────────────────────────────
 // 의도 분석
 // ─────────────────────────────────────────
-export function analyzeIntent({
+    function analyzeIntent({
     inputText = '',
     conflicts = [],
     rawScore = 0,
