@@ -767,24 +767,19 @@ function showModal(original, translated, isKorean, cardText) {
 
     // ✅ 최종 렌더 (한 번만)
     document.getElementById('modal-body').innerHTML = `<div class="modal-sentence-area">${toneInfo}</div><div class="modal-divider"></div><div class="chunk-grid">${chunkHtml}</div>`;
-
     modal.style.display = 'flex';
 }
-
 // ─── 이벤트 핸들러 ────────────────────────────────────────────
 const clearBtn   = document.getElementById('clear-btn');
 const sendBtn    = document.getElementById('send-btn');
 const modalClose = document.getElementById('modal-close');
 const modeToggle = document.getElementById('mode-toggle');
-
 if (clearBtn)   clearBtn.onclick   = clearTodayChat;
 if (modeToggle) modeToggle.onclick = toggleMode;
 if (sendBtn)    sendBtn.onclick    = handleSend;
 if (modalClose) modalClose.onclick = () => modal.style.display = 'none';
-
-input.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
+nput.onkeypress = (e) => { if (e.key === 'Enter') handleSend(); };
 modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
-
 document.addEventListener('click', (e) => {
     const card = e.target.closest('.chunk-card');
     if (card) {
@@ -797,23 +792,15 @@ document.addEventListener('click', (e) => {
 });
 
 function buildEnhancedCard({ original, translated, mw }) {
-
     // 사전 기반 북/남 추출
     const found = DICT_MAP.get(translated?.toLowerCase());
-
     const north = found?.standard || found?.standard_word || null;
     const south = found?.southern || found?.southern_word || null;
-
     const hasDiff = north && south && north !== south;
-
     // 감정 상태
     let tone = '🧠 안정';
     if (mw?.rrp > 0.7) tone = '🔴 갈등';
     else if (mw?.rrp > 0.4) tone = '🟡 긴장';
-    return `
-        <div style="line-height:1.4">            
-            <div style="font-size:16px; font-weight:600;">${translated}</div>${hasDiff ? `<div style="font-size:12px; opacity:0.8; margin-top:4px;">🇻🇳 북부: ${north} · 남부: ${south}
-            </div>` : ''}<div style="font-size:11px; opacity:0.6; margin-top:4px;">${tone} · ${mw.intentState}</div>
-        </div>
+    return `<div style="line-height:1.4"><div style="font-size:16px; font-weight:600;">${translated}</div>${hasDiff ? `<div style="font-size:12px; opacity:0.8; margin-top:4px;">🇻🇳 북부: ${north} · 남부: ${south}</div>` : ''}<div style="font-size:11px; opacity:0.6; margin-top:4px;">${tone} · ${mw.intentState}</div></div>
     `;
 }
