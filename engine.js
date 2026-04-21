@@ -82,7 +82,7 @@ function restoreChat(logs) {
     history.scrollTop = history.scrollHeight;
 }
 
-export function calcEmotionScore(text = '') {
+    function calcEmotionScore(text = '') {
     let score = 0;
 
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
