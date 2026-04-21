@@ -34,22 +34,54 @@ async function corechatFetch(path, method = 'GET', body = null) {
 }
 
 // ─────────────────────────────────────────────
-// CHAT (Gemini 번역)
+// CHAT (Gemini 번역 + MindWorld 감정 연동)
 // ─────────────────────────────────────────────
-async function handleChat(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { text, history = [], softTone = false, dialect = 'vi_south' } = req.body;
+import { runMindWorld } from './mindworld.js';
+import { calcEmotionScore } from './engine.js';
+
+async function handleChat(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const { text, history = [], dialect = 'vi_south' } = req.body;
     if (!text) return res.status(400).json({ error: 'text is required' });
 
+    // ─────────────────────────
+    // 1️⃣ 감정 분석 (CoreRing 핵심)
+    // ─────────────────────────
+    const rawScore = calcEmotionScore(text);
+
+    const mw = runMindWorld({
+        rawScore,
+        inputText: text,
+        sessionLogs: history,
+        conflicts: []
+    });
+
+    const { rrp, intentState } = mw;
+
+    // ─────────────────────────
+    // 2️⃣ 톤 가이드 생성
+    // ─────────────────────────
+    const toneGuide = buildToneGuide({ rrp, intentState });
+
+    // ─────────────────────────
+    // 3️⃣ 사투리 설정
+    // ─────────────────────────
     const dialectGuide =
         dialect === 'vi_north' ? '베트남 북부(하노이) 구어체 기준으로 번역.' :
         dialect === 'vi_south' ? '베트남 남부(호치민) 구어체 기준으로 번역.' :
         '표준 베트남어 기준으로 번역.';
 
+    // ─────────────────────────
+    // 4️⃣ 시스템 프롬프트
+    // ─────────────────────────
     const SYSTEM_PROMPT = `
 당신은 한국-베트남 부부 통역사입니다.
 ${dialectGuide}
+
 규칙:
 1. 번역 결과만 출력. 설명 절대 금지.
 2. 괄호, 태그, 안내문구 절대 금지.
@@ -57,14 +89,16 @@ ${dialectGuide}
 4. 한 줄로만 출력.
 `.trim();
 
+    // ─────────────────────────
+    // 5️⃣ 언어 방향
+    // ─────────────────────────
     const isKorean   = /[ㄱ-ㅎ|가-힣]/.test(text);
     const direction  = isKorean ? 'KO→VI' : 'VI→KO';
     const targetLang = isKorean ? '베트남어' : '한국어';
 
-    const toneGuide = softTone
-        ? '\n⚠️ 현재 감정 긴장 상태. 모든 표현을 최대한 부드럽고 따뜻하게 번역할 것.'
-        : '';
-
+    // ─────────────────────────
+    // 6️⃣ 대화 맥락
+    // ─────────────────────────
     const contextText = history.slice(-5).map((log, i) =>
         `[대화 ${i + 1}] 원문: "${log.input}" → 번역: "${log.output}"`
     ).join('\n');
@@ -73,7 +107,13 @@ ${dialectGuide}
         ? `\n[이전 대화 맥락]\n${contextText}\n위 맥락을 참고해서 번역하세요.`
         : '';
 
-    const fullPrompt = `${SYSTEM_PROMPT}${toneGuide}${contextGuide}\n\n다음 문장을 ${targetLang}로 번역하세요:\n"${text}"`;
+    // ─────────────────────────
+    // 7️⃣ 최종 프롬프트
+    // ─────────────────────────
+    const fullPrompt = `${SYSTEM_PROMPT}${toneGuide}${contextGuide}
+
+다음 문장을 ${targetLang}로 번역하세요:
+"${text}"`;
 
     try {
         const geminiRes = await fetch(
@@ -86,22 +126,89 @@ ${dialectGuide}
                 },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: fullPrompt }] }],
-                    generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
+                    generationConfig: {
+                        temperature: 0.3,
+                        maxOutputTokens: 512
+                    },
                 }),
             }
         );
+
         if (!geminiRes.ok) {
             const err = await geminiRes.json();
             throw new Error(err.error?.message || 'Gemini API 오류');
         }
+
         const geminiData = await geminiRes.json();
-        const translated = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        let translated = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (!translated) throw new Error('번역 결과 없음');
-        return res.status(200).json({ translated, direction, softTone });
+
+        // ─────────────────────────
+        // 8️⃣ 후처리 (2차 안전장치)
+        // ─────────────────────────
+        translated = applyTonePostProcess({
+            text: translated,
+            rrp,
+            intentState
+        });
+
+        return res.status(200).json({
+            translated,
+            direction,
+            rrp,
+            intentState
+        });
+
     } catch (e) {
         return res.status(500).json({ error: e.message });
     }
 }
+
+// ─────────────────────────────────────────
+// 🔥 Tone Guide (LLM용)
+// ─────────────────────────────────────────
+function buildToneGuide({ rrp = 0, intentState = 'CALM' }) {
+
+    if (rrp < 0.3 && intentState === 'CALM') {
+        return '';
+    }
+
+    if (rrp < 0.7) {
+        return `
+⚠️ 대화에 약간의 긴장감이 있습니다.
+직접적인 표현을 피하고, 부드럽고 정중하게 번역하세요.
+`;
+    }
+
+    return `
+⚠️ 현재 감정 갈등 상태입니다.
+공격적 표현 금지.
+완곡하고 조심스럽게 표현하세요.
+상대 감정을 진정시키는 방향으로 번역하세요.
+`;
+}
+
+// ─────────────────────────────────────────
+// 🔥 후처리 (Rule 기반 안전장치)
+// ─────────────────────────────────────────
+function applyTonePostProcess({ text = '', rrp = 0, intentState = 'CALM' }) {
+
+    if (rrp < 0.3) return text;
+
+    // MEDIUM
+    if (rrp < 0.7) {
+        return text
+            .replace(/야/g, '요')
+            .replace(/해라/g, '해주세요')
+            .replace(/왜/g, '혹시 왜');
+    }
+
+    // HIGH
+    return `혹시 오해가 있을 수도 있어서 조심스럽게 말씀드리면, ${text}`;
+}
+
+export default handleChat;
 
 // ─────────────────────────────────────────────
 // LOG
