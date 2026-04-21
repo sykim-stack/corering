@@ -82,7 +82,7 @@ function restoreChat(logs) {
     history.scrollTop = history.scrollHeight;
 }
 
-function calcEmotionScore(text = '') {
+    function calcEmotionScore(text = '') {
     let score = 0;
 
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
@@ -569,7 +569,7 @@ async function handleSend() {
         const target = isKorean ? 'VI' : 'KO';
         const res  = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
-
+        
         // ← 여기가 핵심 수정
         const rawTranslation = data?.translations?.[0]?.text;
         if (!rawTranslation) {
@@ -591,26 +591,26 @@ async function handleSend() {
         sessionLogs.push({ input: text, output: rawTranslation, rawScore, timestamp: Date.now() });
 
         // 🔥 업그레이드된 카드 생성
-        let topHtml = buildEnhancedCard({
-            original: text,
-            translated: rawTranslation,
-            mw,
-        });
+let topHtml = buildEnhancedCard({
+    original: text,
+    translated: rawTranslation,
+    mw,
+});
 
-        // 기존 뱃지 유지
-        if (conflicts.length > 0) {
-            topHtml += conflicts.some(c => c.severity === 'high')
-                ? ' <span class="conflict-badge">🔴 방언 주의</span>'
-                : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
-        }
+// 기존 뱃지 유지
+if (conflicts.length > 0) {
+    topHtml += conflicts.some(c => c.severity === 'high')
+        ? ' <span class="conflict-badge">🔴 방언 주의</span>'
+        : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+}
 
-        if (mw.level === 'HIGH') {
-            topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
-        } else if (mw.level === 'MEDIUM') {
-            topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
-        }
+if (mw.level === 'HIGH') {
+    topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
+} else if (mw.level === 'MEDIUM') {
+    topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
+}
 
-        topHtml += buildIntentBadge(mw.intent);
+topHtml += buildIntentBadge(mw.intent);
         if (conflicts.length > 0) {
             topHtml += conflicts.some(c => c.severity === 'high')
                 ? ' <span class="conflict-badge">🔴 방언 주의</span>'
@@ -805,11 +805,8 @@ document.addEventListener('click', (e) => {
 
 function buildEnhancedCard({ original, translated, mw }) {
 
-    // 🔥 안전 처리 (이거 중요)
-    const cleanText = (translated || '').trim();
-
     // 사전 기반 북/남 추출
-    const found = DICT_MAP.get(cleanText.toLowerCase());
+    const found = DICT_MAP.get(translated?.toLowerCase());
 
     const north = found?.standard || found?.standard_word || null;
     const south = found?.southern || found?.southern_word || null;
@@ -821,19 +818,23 @@ function buildEnhancedCard({ original, translated, mw }) {
     if (mw?.rrp > 0.7) tone = '🔴 갈등';
     else if (mw?.rrp > 0.4) tone = '🟡 긴장';
 
-    // 🔥 핵심: 줄바꿈 최소화 + trim()
     return `
-<div style="line-height:1.4">
-    <div style="font-size:16px; font-weight:600;">
-        ${cleanText}
-    </div>
-    ${hasDiff ? `
-    <div style="font-size:12px; opacity:0.8; margin-top:4px;">
-        🇻🇳 북부: ${north} · 남부: ${south}
-    </div>` : ''}
-    <div style="font-size:11px; opacity:0.6; margin-top:4px;">
-        ${tone} · ${mw?.intentState || 'CALM'}
-    </div>
-</div>
-`.trim();
+        <div style="line-height:1.4">
+            
+            <div style="font-size:16px; font-weight:600;">
+                ${translated}
+            </div>
+
+            ${hasDiff ? `
+            <div style="font-size:12px; opacity:0.8; margin-top:4px;">
+                🇻🇳 북부: ${north} · 남부: ${south}
+            </div>
+            ` : ''}
+
+            <div style="font-size:11px; opacity:0.6; margin-top:4px;">
+                ${tone} · ${mw.intentState}
+            </div>
+
+        </div>
+    `;
 }
