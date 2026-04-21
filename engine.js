@@ -694,9 +694,10 @@ function showModal(original, translated, isKorean, cardText) {
 
     const sentenceCard = `<div class="chunk-card sentence-unit"><div class="chunk-header"><span class="chunk-v">${translated}</span></div><span class="chunk-k">${original}</span></div>`;
 
-    const rawScore = calcEmotionScore(original);
-const mw = runMindWorld({
-    rawScore,
+    const modalRawScore = calcEmotionScore(original);
+
+    const mw = runMindWorld({
+    rawScore: modalRawScore,
     inputText: original,
     sessionLogs,
     conflicts: []
