@@ -16,7 +16,7 @@ const supabaseAnon = createClient(
 
 // corechat 스키마 직접 fetch 헬퍼
 async function corechatFetch(path, method = 'GET', body = null) {
-    const url = `${process.env.SUPABASE_URL}/rest/v1/${path}`;
+    const url = `${.SUPABASE_URL}/rest/v1/${path}`;
     const headers = {
         'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -415,7 +415,7 @@ async function handleSendMessage(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// JOIN ROOM
+// JOIN ROOM (Join-first 통합 구조 v2.3)
 // ─────────────────────────────────────────────
 async function handleJoinRoom(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
@@ -423,19 +423,89 @@ async function handleJoinRoom(req, res) {
     const { invite_code, nickname = null, device_id = null } = req.body;
     if (!invite_code) return res.status(400).json({ error: 'invite_code 필수' });
 
-    const { data: room, error } = await supabaseService
+    const code = invite_code.toUpperCase();
+
+    // ── Step 1: core_user 보장 (join-room에서 처리) ──
+    if (device_id) {
+        const { data: existingUser } = await supabaseService
+            .from('core_users')
+            .select('id')
+            .eq('device_id', device_id)
+            .limit(1);
+
+        if (!existingUser || existingUser.length === 0) {
+            const coreId = 'core_user_' + Math.random().toString(36).slice(2, 8).toUpperCase();
+            await supabaseService
+                .from('core_users')
+                .insert({ core_id: coreId, device_id })
+                .select()
+                .single();
+        }
+    }
+
+    // ── Step 2: room 조회 ──
+    let room = null;
+    const { data: existing } = await supabaseService
         .from('chat_rooms')
         .select('*')
-        .eq('invite_code', invite_code.toUpperCase())
+        .eq('invite_code', code)
         .single();
 
-    if (error) return res.status(404).json({ error: '존재하지 않는 초대 코드입니다.' });
+    if (existing) {
+        room = existing;
+    } else {
+        // ── Step 3: 없으면 생성 ──
+        const { data: created, error: createErr } = await supabaseService
+            .from('chat_rooms')
+            .insert({
+                invite_code:     code,
+                room_type:       'dm',
+                owner_device_id: device_id,
+                is_permanent:    true,
+            })
+            .select()
+            .single();
 
-    await supabaseService
-        .from('chat_participants')
-        .insert({ room_id: room.id, nickname, device_id });
+        if (createErr) {
+            // Race condition: unique 충돌 → 재조회
+            if (createErr.code === '23505') {
+                const { data: retried } = await supabaseService
+                    .from('chat_rooms')
+                    .select('*')
+                    .eq('invite_code', code)
+                    .single();
+                room = retried;
+            } else {
+                return res.status(500).json({ error: '방 생성 실패', detail: createErr.message });
+            }
+        } else {
+            room = created;
+        }
+    }
 
-    return res.json(room);
+    if (!room) return res.status(500).json({ error: '방을 찾을 수 없어요' });
+
+    // ── Step 4: participant 중복 없이 등록 ──
+    if (device_id) {
+        const { data: existingParticipant } = await supabaseService
+            .from('chat_participants')
+            .select('id')
+            .eq('room_id', room.id)
+            .eq('device_id', device_id)
+            .limit(1);
+
+        if (!existingParticipant || existingParticipant.length === 0) {
+            await supabaseService
+                .from('chat_participants')
+                .insert({ room_id: room.id, nickname, device_id });
+        }
+    }
+
+    return res.json({
+        ...room,
+        joined:  true,
+        created: !existing,
+    });
 }
 
 // ─────────────────────────────────────────────
