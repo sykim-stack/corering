@@ -82,7 +82,7 @@ function restoreChat(logs) {
     history.scrollTop = history.scrollHeight;
 }
 
-    function calcEmotionScore(text = '') {
+function calcEmotionScore(text = '') {
     let score = 0;
 
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
@@ -569,7 +569,7 @@ async function handleSend() {
         const target = isKorean ? 'VI' : 'KO';
         const res  = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
         const data = await res.json();
-        
+
         // ← 여기가 핵심 수정
         const rawTranslation = data?.translations?.[0]?.text;
         if (!rawTranslation) {
@@ -591,26 +591,26 @@ async function handleSend() {
         sessionLogs.push({ input: text, output: rawTranslation, rawScore, timestamp: Date.now() });
 
         // 🔥 업그레이드된 카드 생성
-let topHtml = buildEnhancedCard({
-    original: text,
-    translated: rawTranslation,
-    mw,
-});
+        let topHtml = buildEnhancedCard({
+            original: text,
+            translated: rawTranslation,
+            mw,
+        });
 
-// 기존 뱃지 유지
-if (conflicts.length > 0) {
-    topHtml += conflicts.some(c => c.severity === 'high')
-        ? ' <span class="conflict-badge">🔴 방언 주의</span>'
-        : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
-}
+        // 기존 뱃지 유지
+        if (conflicts.length > 0) {
+            topHtml += conflicts.some(c => c.severity === 'high')
+                ? ' <span class="conflict-badge">🔴 방언 주의</span>'
+                : ' <span class="conflict-badge">⚠️ 방언 주의</span>';
+        }
 
-if (mw.level === 'HIGH') {
-    topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
-} else if (mw.level === 'MEDIUM') {
-    topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
-}
+        if (mw.level === 'HIGH') {
+            topHtml += ' <span class="conflict-badge risk-badge">🔴 갈등 감지</span>';
+        } else if (mw.level === 'MEDIUM') {
+            topHtml += ' <span class="conflict-badge risk-badge risk-medium">🟡 주의</span>';
+        }
 
-topHtml += buildIntentBadge(mw.intent);
+        topHtml += buildIntentBadge(mw.intent);
         if (conflicts.length > 0) {
             topHtml += conflicts.some(c => c.severity === 'high')
                 ? ' <span class="conflict-badge">🔴 방언 주의</span>'
