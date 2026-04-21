@@ -82,15 +82,32 @@ function restoreChat(logs) {
     history.scrollTop = history.scrollHeight;
 }
 
-function calcEmotionScore(text) {
+export function calcEmotionScore(text = '') {
     let score = 0;
+
     const negativeWords = ['왜', '짜증', '싫어', '됐어', '몰라', '하지마', '그만'];
-    const positiveWords  = ['고마워', '사랑해', '괜찮아', '미안해'];
-    negativeWords.forEach(w => { if (text.includes(w)) score += 2; });
-    positiveWords.forEach(w  => { if (text.includes(w)) score -= 1; });
-    if (text.length < 5)                          score += 1;
+    const positiveWords = ['고마워', '사랑해', '괜찮아', '미안해'];
+
+    // 부정어
+    negativeWords.forEach(w => {
+        if (text.includes(w)) score += 2;
+    });
+
+    // 긍정어 (갈등 완화)
+    positiveWords.forEach(w => {
+        if (text.includes(w)) score -= 1;
+    });
+
+    // 짧은 문장 → 오해 가능성 ↑
+    if (text.length > 0 && text.length < 5) score += 1;
+
+    // 감정 강조
     if (text.includes('!') || text.includes('?')) score += 1;
-    return Math.max(0, score);
+
+    // 🔥 안정화 (중요)
+    score = Math.max(0, Math.min(10, score));
+
+    return score;
 }
 
 function buildDictionaryIndex() {

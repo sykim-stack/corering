@@ -4,134 +4,147 @@
 // 변경: analyzeIntent() 추가, runMindWorld() conflicts 파라미터 추가 (v1.1)
 // ============================================================
 
-// ─── 감정 점수 정규화 (0~1) ───────────────────────────────────
-function normalizeEmotion(rawScore) {
-    return Math.min(1, Math.max(0, rawScore / 10));
+// ─────────────────────────────────────────
+// 감정 정규화 (0~10 → 0~1)
+// ─────────────────────────────────────────
+export function normalizeEmotion(rawScore = 0) {
+    return Math.max(0, Math.min(1, rawScore / 10));
 }
 
-// ─── 역할 감지 (세션 로그 10개 이상 기준) ────────────────────
-function detectRole(sessionLogs) {
-    if (!sessionLogs || sessionLogs.length < 10) return 'unknown';
-    const koCount = sessionLogs.filter(l => /[ㄱ-ㅎ|가-힣]/.test(l.input || '')).length;
-    const viCount = sessionLogs.length - koCount;
-    if (koCount > viCount * 1.5) return 'husband';
-    if (viCount > koCount * 1.5) return 'wife';
-    return 'unknown';
+// ─────────────────────────────────────────
+// CAS (관계 누적 감정)
+// ─────────────────────────────────────────
+export function calculateCAS(scores = []) {
+    if (!scores.length) return 0;
+
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    // 0~10 → 0~1
+    return Math.max(0, Math.min(1, avg / 10));
 }
 
-// ─── 충돌 키워드 감지 (상태 전이용) ──────────────────────────
-function detectConflict(inputText) {
-    const conflictKeywords = ['왜', '싫어', '됐어', '하지마', '그만', 'thôi', 'đừng', 'ghét', 'không muốn'];
-    return conflictKeywords.some(k => (inputText || '').includes(k));
+// ─────────────────────────────────────────
+// RRP (관계 리스크)
+// ─────────────────────────────────────────
+export function calculateRRP({ cas = 0, normalized = 0 }) {
+    const weightCAS = 0.6;
+    const weightEmotion = 0.4;
+
+    const raw = (cas * weightCAS) + (normalized * weightEmotion);
+
+    return Math.max(0, Math.min(1, raw));
 }
 
-// ─── 5상태 전이 머신 ──────────────────────────────────────────
-// CALM → TENSE → CONFLICT → RECOVERY → STABLE
-function nextIntentState({ currentState, hasConflict, normalized }) {
-    const state = currentState || 'CALM';
+// ─────────────────────────────────────────
+// 역할 추정
+// ─────────────────────────────────────────
+export function detectRole(sessionLogs = []) {
+    if (!sessionLogs.length) return 'neutral';
 
-    if (hasConflict) {
-        if (state === 'CALM')     return 'TENSE';
-        if (state === 'TENSE')    return 'CONFLICT';
-        if (state === 'CONFLICT') return 'CONFLICT';
-        if (state === 'RECOVERY') return 'TENSE';
-        if (state === 'STABLE')   return 'TENSE';
-    } else {
-        if (normalized < 0.3) {
-            if (state === 'CONFLICT') return 'RECOVERY';
-            if (state === 'TENSE')    return 'CALM';
-            if (state === 'RECOVERY') return 'STABLE';
-        }
-    }
-    return state;
+    const last = sessionLogs[sessionLogs.length - 1];
+    if (!last) return 'neutral';
+
+    if (last.rawScore >= 6) return 'aggressor';
+    if (last.rawScore <= 2) return 'stable';
+
+    return 'neutral';
 }
 
-// ─── 갈등 누적 점수 (최근 5개 슬라이딩 윈도우) ───────────────
-function calculateCAS(scoreHistory) {
-    if (!scoreHistory || scoreHistory.length === 0) return 0;
-    const recent = scoreHistory.slice(-5);
-    const sum    = recent.reduce((a, b) => a + (b || 0), 0);
-    return sum / recent.length;
+// ─────────────────────────────────────────
+// 갈등 감지
+// ─────────────────────────────────────────
+export function detectConflict(text = '') {
+    const keywords = ['왜', '짜증', '싫어', '그만', '하지마', '됐어'];
+
+    return keywords.some(k => text.includes(k));
 }
 
-// ─── 관계 리스크 확률 (바이어스 -2.0 적용) ───────────────────
-function calculateRRP({ cas, normalized }) {
-    const raw = (cas * 0.6) + (normalized * 10 * 0.4) - 2.0;
-    return Math.min(1, Math.max(0, raw / 10));
+// ─────────────────────────────────────────
+// 상태 전이 (Intent State)
+// ─────────────────────────────────────────
+export function nextIntentState({ currentState = 'CALM', hasConflict = false, normalized = 0 }) {
+
+    if (normalized > 0.7) return 'ESCALATED';
+    if (hasConflict && normalized > 0.4) return 'TENSE';
+    if (normalized < 0.2) return 'CALM';
+
+    return currentState;
 }
 
-// ─── Decision Layer (Gemini 분기 여부 결정) ───────────────────
-function evaluateRisk({ rrp, intentState }) {
-    if (rrp >= 0.7 || intentState === 'CONFLICT') {
-        return { level: 'HIGH',   useGemini: true  };
-    }
-    if (rrp >= 0.4 || intentState === 'TENSE') {
-        return { level: 'MEDIUM', useGemini: false };
-    }
-    return     { level: 'LOW',    useGemini: false };
+// ─────────────────────────────────────────
+// 위험도 평가
+// ─────────────────────────────────────────
+export function evaluateRisk({ rrp = 0, intentState = 'CALM' }) {
+
+    let level = 'LOW';
+
+    if (rrp > 0.7 || intentState === 'ESCALATED') level = 'HIGH';
+    else if (rrp > 0.4 || intentState === 'TENSE') level = 'MEDIUM';
+
+    return { level };
 }
 
-// ─── 의도 분류 (순수 로직) ────────────────────────────────────
-// intent: REQUEST | COMPLAINT | THREAT | AFFECTION | NEUTRAL
-function analyzeIntent({ inputText, conflicts = [], rawScore = 0, intentState = 'CALM' }) {
-    const text = inputText || '';
+// ─────────────────────────────────────────
+// 의도 분석
+// ─────────────────────────────────────────
+export function analyzeIntent({
+    inputText = '',
+    conflicts = [],
+    rawScore = 0,
+    intentState = 'CALM',
+}) {
 
-    const intentMap = {
-        THREAT:    ['하지마', '그만해', '됐어', '꺼져', 'thôi', 'đừng', 'ghét'],
-        COMPLAINT: ['왜', '짜증', '싫어', '몰라', 'sao lại', 'không thích', 'bực'],
-        REQUEST:   ['해줘', '부탁', '원해', '있어?', 'giúp', 'được không', 'muốn'],
-        AFFECTION: ['사랑해', '고마워', '미안해', '보고싶어', 'yêu', 'cảm ơn', 'nhớ'],
-    };
-
-    let detected = 'NEUTRAL';
-    let maxHits  = 0;
-
-    for (const [intent, keywords] of Object.entries(intentMap)) {
-        const hits = keywords.filter(k => text.includes(k)).length;
-        if (hits > maxHits) {
-            maxHits  = hits;
-            detected = intent;
-        }
-    }
-// 2차: 충돌 단어 가중 보정
-const meaningFlipConflicts = conflicts.filter(
-    c => c.conflict_type === 'meaning_flip' && c.severity === 'high'
-);
-if (meaningFlipConflicts.length > 0) {    // ← 이걸로 바꾸세요
-    if (detected === 'NEUTRAL')        detected = 'COMPLAINT';
-    else if (detected === 'COMPLAINT') detected = 'THREAT';
-}
-
-    if (intentState === 'CONFLICT' && detected === 'NEUTRAL') {
-        detected = 'COMPLAINT';
+    if (intentState === 'ESCALATED') {
+        return { intent: 'attack', confidence: 0.9 };
     }
 
-    if (rawScore >= 6 && detected === 'NEUTRAL') {
-        detected = 'COMPLAINT';
+    if (intentState === 'TENSE') {
+        return { intent: 'defensive', confidence: 0.7 };
     }
 
-    return {
-        intent:     detected,
-        confidence: maxHits > 0 ? 'keyword' : 'inferred',
-    };
+    if (rawScore <= 2) {
+        return { intent: 'friendly', confidence: 0.8 };
+    }
+
+    return { intent: 'neutral', confidence: 0.5 };
 }
 
-// ─── 통합 실행 함수 ───────────────────────────────────────────
-function runMindWorld({ rawScore, inputText, sessionLogs = [], conflicts = [] }) {
+// ─────────────────────────────────────────
+// 🔥 통합 실행 함수 (핵심)
+// ─────────────────────────────────────────
+export function runMindWorld({ rawScore = 0, inputText = '', sessionLogs = [], conflicts = [] }) {
 
-    const normalized  = normalizeEmotion(rawScore);
-    const role        = detectRole(sessionLogs);
+    // 1️⃣ 감정 정규화
+    const normalized = normalizeEmotion(rawScore);
+
+    // 2️⃣ 역할
+    const role = detectRole(sessionLogs);
+
+    // 3️⃣ 갈등 여부
     const hasConflict = detectConflict(inputText);
 
-    const prevState   = sessionLogs.length > 1
+    // 4️⃣ 이전 상태
+    const prevState = sessionLogs.length > 1
         ? (sessionLogs[sessionLogs.length - 2].intentState || 'CALM')
         : 'CALM';
-    const intentState = nextIntentState({ currentState: prevState, hasConflict, normalized });
 
-    const cas  = calculateCAS(sessionLogs.map(l => l.rawScore || 0));
-    const rrp  = calculateRRP({ cas, normalized });
+    // 5️⃣ 상태 전이
+    const intentState = nextIntentState({
+        currentState: prevState,
+        hasConflict,
+        normalized
+    });
+
+    // 6️⃣ 관계 누적
+    const cas = calculateCAS(sessionLogs.map(l => l.rawScore || 0));
+
+    // 7️⃣ 🔥 핵심 (수정 완료된 부분)
+    const rrp = calculateRRP({ cas, normalized });
+
+    // 8️⃣ 위험도
     const risk = evaluateRisk({ rrp, intentState });
 
+    // 9️⃣ 의도 분석
     const intentResult = analyzeIntent({
         inputText,
         conflicts,
@@ -140,12 +153,12 @@ function runMindWorld({ rawScore, inputText, sessionLogs = [], conflicts = [] })
     });
 
     return {
-        level:      risk.level,
+        level: risk.level,
         intentState,
         role,
         rrp,
         cas,
-        intent:     intentResult.intent,
+        intent: intentResult.intent,
         confidence: intentResult.confidence,
     };
 }
