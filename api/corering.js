@@ -125,6 +125,8 @@ async function handlePipeline(req, res) {
 async function handleGetConflicts(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+    console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
+console.log('SUPABASE_KEY:', process.env.SUPABASE_ANON_KEY);
 
     try {
         const response = await fetch(
