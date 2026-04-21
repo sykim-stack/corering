@@ -801,6 +801,5 @@ function buildEnhancedCard({ original, translated, mw }) {
     let tone = '🧠 안정';
     if (mw?.rrp > 0.7) tone = '🔴 갈등';
     else if (mw?.rrp > 0.4) tone = '🟡 긴장';
-    return `<div style="line-height:1.4"><div style="font-size:16px; font-weight:600;">${translated}</div>${hasDiff ? `<div style="font-size:12px; opacity:0.8; margin-top:4px;">🇻🇳 북부: ${north} · 남부: ${south}</div>` : ''}<div style="font-size:11px; opacity:0.6; margin-top:4px;">${tone} · ${mw.intentState}</div></div>
-    `;
+    return `<div style="line-height:1.4"><div style="font-size:24px; font-weight:600;">${translated}</div>${hasDiff ? `<div style="font-size:16px; opacity:0.8; margin-top:4px;">🇻🇳 북부: ${north} · 남부: ${south}</div>` : ''}<div style="font-size:11px; opacity:0.6; margin-top:4px;">${tone} · ${mw.intentState}</div></div>`;
 }
