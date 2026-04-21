@@ -692,68 +692,90 @@ function showModal(original, translated, isKorean, cardText) {
     let chunkHtml = '';
     const words   = tokenizeVietnamese(cardText);
 
-    const sentenceCard = `<div class="chunk-card sentence-unit"><div class="chunk-header"><span class="chunk-v">${translated}</span></div><span class="chunk-k">${original}</span></div>`;
+    const sentenceCard = `
+        <div class="chunk-card sentence-unit">
+            <div class="chunk-header">
+                <span class="chunk-v">${translated}</span>
+            </div>
+            <span class="chunk-k">${original}</span>
+        </div>
+    `;
 
+    // ✅ 감정 계산 (한 번만)
     const modalRawScore = calcEmotionScore(original);
 
     const mw = runMindWorld({
-    rawScore: modalRawScore,
-    inputText: original,
-    sessionLogs,
-    conflicts: []
-});
+        rawScore: modalRawScore,
+        inputText: original,
+        sessionLogs,
+        conflicts: []
+    });
 
-const toneInfo = `
-<div style="font-size:12px; opacity:0.7; margin-top:6px;">
-🧠 상태: ${mw.intentState} (${mw.rrp.toFixed(2)})
-</div>
-`;
+    const toneInfo = `
+        <div style="font-size:12px; opacity:0.7; margin-top:6px;">
+            🧠 상태: ${mw.intentState} (${mw.rrp.toFixed(2)})
+        </div>
+    `;
 
+    // ─── 단어 카드 생성 ───
     words.forEach(word => {
         const cleanWord = word.replace(/[.,!?]/g, '');
         if (!cleanWord) return;
+
         const clean = cleanWord.toLowerCase();
         const found = DICT_MAP.get(clean) || DICT_MEANING_MAP.get(clean);
         if (!found) return;
         if (found.entry_type === 'auxiliary') return;
-        const standard       = found.standard || found.standard_word || cleanWord;
-        const southern       = found.southern || found.southern_word || cleanWord;
+
+        const standard = found.standard || found.standard_word || cleanWord;
+        const southern = found.southern || found.southern_word || cleanWord;
+
         const hasDialectDiff = standard.toLowerCase() !== southern.toLowerCase();
-        const typeClass      = found.entry_type === 'phrase' ? 'type-phrase' : '';
-        chunkHtml += `<div class="chunk-card ${typeClass} ${hasDialectDiff ? 'dialect-card' : ''}"><div class="chunk-header"><span class="chunk-v">${cleanWord}</span></div><span class="chunk-north">북부: ${standard}</span><span class="chunk-south ${hasDialectDiff ? 'dialect-diff' : ''}">남부: ${southern}</span><span class="chunk-k">${found.meaning || found.meaning_ko || '—'}</span></div>`;
+        const typeClass = found.entry_type === 'phrase' ? 'type-phrase' : '';
+
+        chunkHtml += `
+            <div class="chunk-card ${typeClass} ${hasDialectDiff ? 'dialect-card' : ''}">
+                <div class="chunk-header">
+                    <span class="chunk-v">${cleanWord}</span>
+                </div>
+                <span class="chunk-north">북부: ${standard}</span>
+                <span class="chunk-south ${hasDialectDiff ? 'dialect-diff' : ''}">
+                    남부: ${southern}
+                </span>
+                <span class="chunk-k">
+                    ${found.meaning || found.meaning_ko || '—'}
+                </span>
+            </div>
+        `;
     });
 
+    // ─── 충돌 카드 ───
     detectConflicts(cardText, CONFLICT_DICTIONARY).forEach(item => {
         const severityIcon = item.severity === 'high' ? '🔴' : '⚠️';
-        chunkHtml += `<div class="chunk-card conflict-card"><span class="chunk-v">${severityIcon} ${item.word}</span><span class="chunk-north">북부: ${item.meaning_northern}</span><span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>${item.note ? `<span class="chunk-k">${item.note}</span>` : ''}</div>`;
+
+        chunkHtml += `
+            <div class="chunk-card conflict-card">
+                <span class="chunk-v">${severityIcon} ${item.word}</span>
+                <span class="chunk-north">북부: ${item.meaning_northern}</span>
+                <span class="chunk-south dialect-diff">남부: ${item.meaning_southern}</span>
+                ${item.note ? `<span class="chunk-k">${item.note}</span>` : ''}
+            </div>
+        `;
     });
 
     trackEvent('modal_open', { original, translated, timestamp: Date.now() });
 
-    const rawScore = calcEmotionScore(original);
-const mw = runMindWorld({
-    rawScore,
-    inputText: original,
-    sessionLogs,
-    conflicts: []
-});
+    // ✅ 최종 렌더 (한 번만)
+    document.getElementById('modal-body').innerHTML = `
+        <div class="modal-sentence-area">
+            ${sentenceCard}
+            ${toneInfo}
+        </div>
+        <div class="modal-divider"></div>
+        <div class="chunk-grid">${chunkHtml}</div>
+    `;
 
-const toneInfo = `
-<div style="font-size:12px; opacity:0.7; margin-top:6px;">
-    🧠 상태: ${mw.intentState} (${mw.rrp.toFixed(2)})
-</div>
-`;
-
-document.getElementById('modal-body').innerHTML = `
-    <div class="modal-sentence-area">
-        ${sentenceCard}
-        ${toneInfo}
-    </div>
-    <div class="modal-divider"></div>
-    <div class="chunk-grid">${chunkHtml}</div>
-`;
-
-modal.style.display = 'flex';
+    modal.style.display = 'flex';
 }
 
 // ─── 이벤트 핸들러 ────────────────────────────────────────────
