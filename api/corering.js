@@ -383,4 +383,16 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    
+    const action = req.query.action || req.body?.action;
+
+    switch (action) {
+        case 'translate':      return handleTranslate(req, res);
+        case 'pipeline':       return handlePipeline(req, res);
+        case 'get-conflicts':  return handleGetConflicts(req, res);
+        case 'get-dictionary': return handleGetDictionary(req, res);
+        case 'southern-fill':  return handleSouthernFill(req, res);
+        case 'corelink':       return handleCorelink(req, res);
+        default:
+            return res.status(400).json({ error: 'action 파라미터 필요 (translate | pipeline | get-conflicts | get-dictionary | southern-fill | corelink)' });
+    }
+};
