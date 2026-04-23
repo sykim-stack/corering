@@ -37,9 +37,6 @@ async function corechatFetch(path, method = 'GET', body = null) {
 // CHAT (Gemini 번역 + MindWorld 감정 연동)
 // ─────────────────────────────────────────────
 
-import { runMindWorld } from './mindworld.js';
-import { calcEmotionScore } from './engine.js';
-
 async function handleChat(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
