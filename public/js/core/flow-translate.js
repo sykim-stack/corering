@@ -14,7 +14,7 @@
  * @param {boolean} isKorean
  * @returns {Promise<{ rawTranslation: string, emotion: null, tone: null }>}
  */
-export async function translateRing(text, isKorean) {
+    async function translateRing(text, isKorean) {
     const target = isKorean ? 'VI' : 'KO';
     const res    = await fetch(
         `/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`
@@ -43,7 +43,7 @@ export async function translateRing(text, isKorean) {
  * @param {string}   dialect      - 'vi_north' | 'vi_south' | 'vi_neutral'
  * @returns {Promise<{ rawTranslation: string, emotion: null, tone: null }>}
  */
-export async function translateChat(text, isKorean, history = [], softTone = false, dialect = 'vi_south') {
+    async function translateChat(text, isKorean, history = [], softTone = false, dialect = 'vi_south') {
     const res = await fetch('/api/corechat?action=chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,7 +72,7 @@ export async function translateChat(text, isKorean, history = [], softTone = fal
     };
 }
 
-export async function translateChatMessage(text, isKorean) {
+    async function translateChatMessage(text, isKorean) {
     const target = isKorean ? 'VI' : 'KO';
 
     const res = await fetch(
