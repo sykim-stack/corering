@@ -4,7 +4,7 @@
 // window 바인딩: 기존 전부 유지 + translateChatMsg, copyRoomCode 추가
 // ============================================================
 
-import { translateRing, translateChat } from 'pubic/js/core/flow-translate.js';
+import { translateRing, translateChat } from '/public/js/core/flow-translate.js';
 
 // ── 전역 참조 (기존 script 태그로 로드된 파일들) ─────────────
 // dialect.js    → detectDialectScore, resolveDialect
