@@ -179,7 +179,7 @@ function applyTonePostProcess({ text = '', rrp = 0, intentState = 'CALM' }) {
     return `혹시 오해가 있을 수도 있어서 조심스럽게 말씀드리면, ${text}`;
 }
 
-export default handleChat;
+module.export default handleChat;
 
 // ─────────────────────────────────────────────
 // LOG
