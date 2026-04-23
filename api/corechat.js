@@ -383,7 +383,7 @@ async function handleGetMessages(req, res) {
     const { room_id, after } = req.query;
     if (!room_id) return res.status(400).json({ error: 'room_id 필수' });
 
-    let query = supabaseAnon
+    let query = supabaseService  // ← anon → service
         .from('chat_messages')
         .select('*')
         .eq('room_id', room_id)
@@ -512,7 +512,7 @@ async function handleJoinRoom(req, res) {
 // GET ROOMS
 // ─────────────────────────────────────────────
 async function handleGetRooms(req, res) {
-    const { data, error } = await supabaseAnon
+    const { data, error } = await supabaseService  // ← anon → service
         .from('chat_rooms')
         .select('*')
         .order('created_at', { ascending: false });
