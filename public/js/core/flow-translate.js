@@ -1,16 +1,14 @@
 // ============================================================
 // BRAINPOOL | CoreRing · flow-translate.js
-// LANGUAGE LAYER — 순수 번역 함수만 포함
+// LANGUAGE LAYER — 순수 번역 함수
 //
-// 로드 방식: <script src="flow-translate.js"></script>
-// engine.js보다 먼저 로드되어야 함
+// 위치: /public/js/core/flow-translate.js
+// 로드: engine.js에서 import
 //
 // 규칙:
 //   ❌ DOM 접근 금지
 //   ❌ UI 상태 변경 금지
-//   ❌ sessionLogs / saveChatLog 등 side effect 금지
-//   ✅ fetch → parse → return data만 허용
-//   ✅ 사전 인덱스 빌드 포함 (상태는 클로저로 캡슐화)
+//   ✅ fetch → parse → return data만
 // ============================================================
 
 // ── 내부 상태 ────────────────────────────────────────────────
@@ -22,7 +20,7 @@ let _maxPhraseLength    = 1;
 let _initialized        = false;
 
 // ── 사전 인덱스 빌드 ─────────────────────────────────────────
-function buildDictionaryIndex() {
+export function buildDictionaryIndex() {
     _dictMap.clear();
     _dictMeaningMap.clear();
 
@@ -43,14 +41,13 @@ function buildDictionaryIndex() {
         if (len > _maxPhraseLength) _maxPhraseLength = len;
     });
 
-    console.log('[flow-translate] Dict indexed:', _dictMap.size, '| Max phrase:', _maxPhraseLength);
+    console.log('[flow-translate] indexed:', _dictMap.size, '| maxPhrase:', _maxPhraseLength);
 }
 
 // ── 엔진 초기화 ──────────────────────────────────────────────
-async function initEngine() {
+export async function initEngine() {
     if (_initialized) return;
     _initialized = true;
-
     try {
         const [dictRes, conflictRes] = await Promise.all([
             fetch('/api/corering?action=get-dictionary'),
@@ -69,27 +66,48 @@ async function initEngine() {
 }
 
 // ── 접근자 ───────────────────────────────────────────────────
-function getDictionary()         { return _coreDictionary; }
-function getConflictDictionary() { return _conflictDictionary; }
-function getDictMap()            { return _dictMap; }
-function getDictMeaningMap()     { return _dictMeaningMap; }
-function getMaxPhraseLength()    { return _maxPhraseLength; }
-function isEngineInitialized()   { return _initialized; }
+export function getDictionary()         { return _coreDictionary; }
+export function getConflictDictionary() { return _conflictDictionary; }
+export function getDictMap()            { return _dictMap; }
+export function getDictMeaningMap()     { return _dictMeaningMap; }
+export function getMaxPhraseLength()    { return _maxPhraseLength; }
+export function isEngineInitialized()   { return _initialized; }
 
 // ── RING 모드 번역 (DeepL) ───────────────────────────────────
-async function translateRing(text, target) {
-    const res  = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
+/**
+ * @param {string} text
+ * @param {'KO'|'VI'} target
+ * @returns {Promise<{
+ *   rawTranslation: string,
+ *   emotion: null,   // 선택적 — 현재 비활성
+ *   tone: null       // 선택적 — 현재 비활성
+ * }>}
+ */
+export async function translateRing(text, target) {
+    const res  = await fetch(
+        `/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`
+    );
     const data = await res.json();
 
     if (!res.ok || !data.translations?.[0]?.text) {
         throw new Error(data.error || 'translateRing: 번역 실패');
     }
 
-    return { rawTranslation: data.translations[0].text };
+    return {
+        rawTranslation: data.translations[0].text,
+        emotion: null,  // Phase 2에서 활성화
+        tone:    null,  // Phase 2에서 활성화
+    };
 }
 
 // ── CHAT 모드 번역 (Gemini) ──────────────────────────────────
-async function translateChat(text, isKorean, options = {}) {
+/**
+ * @param {string}  text
+ * @param {boolean} isKorean
+ * @param {{softTone?, role?, dialect?, history?}} options
+ * @returns {Promise<{ translated: string, softTone: boolean }>}
+ */
+export async function translateChat(text, isKorean, options = {}) {
     const {
         softTone = false,
         role     = null,
@@ -97,17 +115,14 @@ async function translateChat(text, isKorean, options = {}) {
         history  = [],
     } = options;
 
-    const res = await fetch('/api/corechat?action=chat', {
-        method: 'POST',
+    const res  = await fetch('/api/corechat?action=chat', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, history, softTone, role, dialect }),
+        body:    JSON.stringify({ text, history, softTone, role, dialect }),
     });
-
     const data = await res.json();
 
-    if (!res.ok) {
-        throw new Error(data.error || 'translateChat: 번역 오류');
-    }
+    if (!res.ok) throw new Error(data.error || 'translateChat: 번역 오류');
 
     return {
         translated: data.translated,
@@ -116,9 +131,16 @@ async function translateChat(text, isKorean, options = {}) {
 }
 
 // ── 채팅 메시지 번역 (인라인 버튼 — DOM 없음) ───────────────
-async function translateChatMessage(text, isKorean) {
+/**
+ * @param {string}  text
+ * @param {boolean} isKorean
+ * @returns {Promise<{ translated: string }>}
+ */
+export async function translateChatMessage(text, isKorean) {
     const target = isKorean ? 'VI' : 'KO';
-    const res    = await fetch(`/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`);
+    const res    = await fetch(
+        `/api/corering?action=translate&text=${encodeURIComponent(text)}&target=${target}`
+    );
     const data   = await res.json();
 
     if (!res.ok || !data.translations?.[0]?.text) {
