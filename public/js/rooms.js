@@ -526,3 +526,5 @@ function showRoomToast(msg) {
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)
 }
+   // rooms.js 하단에 추가
+   window.DEVICE_ID = DEVICE_ID;
