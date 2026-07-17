@@ -132,8 +132,8 @@ html, body {
 
 /* Buttons */
 .icon-btn {
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: var(--touch-ls);
+  height: var(--touch-ls);
   display: flex;
   align-items: center;
   justify-content: center;

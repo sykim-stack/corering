@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>인터메리 — 국제결혼의 새로운 기준</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;700&family=DM+Mono:wght@300;400&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:        #080808;
+    --bg2:       #0f0f0f;
+    --bg3:       #161616;
+    --border:    rgba(255,255,255,0.07);
+    --text:      #e8e0d4;
+    --muted:     #555;
+    --accent:    #c9a96e;
+    --accent2:   #8b6f47;
+    --danger:    #e05a5a;
+    --success:   #5aaa7a;
+    --serif:     'Noto Serif KR', serif;
+    --mono:      'DM Mono', monospace;
+    --sans:      'Noto Sans KR', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 노이즈 오버레이 ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 20px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(8,8,8,0.95), transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 18px; font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .logo span { color: var(--text); font-weight: 300; }
+
+  .header-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 120px 24px 80px;
+    position: relative;
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.2s forwards;
+  }
+
+  .hero-title {
+    font-family: var(--serif);
+    font-size: clamp(36px, 7vw, 72px);
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: -1px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.4s forwards;
+  }
+
+  .hero-title em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero-sub {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.8;
+    max-width: 480px;
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.6s forwards;
+  }
+
+  .hero-cta {
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.8s forwards;
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #080808;
+    border: none; cursor: pointer;
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 500;
+    letter-spacing: 1px;
+    padding: 16px 36px;
+    border-radius: 2px;
+    transition: all 0.3s;
+  }
+
+  .btn-primary:hover {
+    background: #d4b47a;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(201,169,110,0.25);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 16px 36px;
+    border-radius: 2px;
+    transition: all 0.3s;
+  }
+
+  .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  /* 스크롤 인디케이터 */
+  .scroll-hint {
+    position: absolute; bottom: 40px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    opacity: 0; animation: fadeUp 1s ease 1.2s forwards;
+  }
+
+  .scroll-hint span {
+    font-family: var(--mono); font-size: 9px;
+    letter-spacing: 3px; color: var(--muted);
+  }
+
+  .scroll-line {
+    width: 1px; height: 40px;
+    background: linear-gradient(to bottom, var(--accent), transparent);
+    animation: scrollPulse 2s ease infinite;
+  }
+
+  /* ── PRODUCTS ── */
+  .section {
+    padding: 100px 24px;
+    max-width: 1000px;
+    margin: 0 auto;
+    position: relative; z-index: 1;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px; letter-spacing: 4px;
+    color: var(--accent); margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: var(--serif);
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 300; line-height: 1.3;
+    margin-bottom: 56px;
+  }
+
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2px;
+  }
+
+  .product-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 36px 28px;
+    cursor: pointer;
+    transition: all 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .product-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.4s;
+  }
+
+  .product-card:hover { background: var(--bg3); transform: translateY(-4px); }
+  .product-card:hover::before { opacity: 1; }
+
+  .product-card.featured {
+    border-color: rgba(201,169,110,0.3);
+    background: linear-gradient(135deg, var(--bg2), rgba(201,169,110,0.04));
+  }
+
+  .product-tag {
+    font-family: var(--mono); font-size: 9px;
+    letter-spacing: 2px; color: var(--accent);
+    margin-bottom: 20px; display: block;
+  }
+
+  .product-name {
+    font-family: var(--serif); font-size: 20px;
+    font-weight: 400; margin-bottom: 12px;
+  }
+
+  .product-desc {
+    font-size: 13px; color: var(--muted);
+    line-height: 1.7; margin-bottom: 28px;
+  }
+
+  .product-price {
+    font-family: var(--mono); font-size: 22px;
+    color: var(--accent);
+  }
+
+  .product-price small {
+    font-size: 11px; color: var(--muted); margin-left: 4px;
+  }
+
+  /* ── SURVEY SECTION ── */
+  .survey-section {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 100px 24px;
+    position: relative; z-index: 1;
+  }
+
+  .survey-inner {
+    max-width: 640px; margin: 0 auto;
+  }
+
+  /* Step 진행 표시 */
+  .step-indicator {
+    display: flex; gap: 4px; margin-bottom: 48px;
+  }
+
+  .step-dot {
+    height: 2px; flex: 1;
+    background: var(--border);
+    transition: background 0.4s;
+  }
+
+  .step-dot.active { background: var(--accent); }
+  .step-dot.done   { background: var(--accent2); }
+
+  /* 설문 단계 */
+  .survey-step {
+    display: none;
+    animation: fadeUp 0.5s ease;
+  }
+
+  .survey-step.active { display: block; }
+
+  .survey-question {
+    font-family: var(--serif); font-size: 22px;
+    font-weight: 300; line-height: 1.5;
+    margin-bottom: 8px;
+  }
+
+  .survey-hint {
+    font-size: 12px; color: var(--muted);
+    margin-bottom: 32px; letter-spacing: 0.5px;
+  }
+
+  /* 선택지 */
+  .options-grid {
+    display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .option-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text); cursor: pointer;
+    font-family: var(--sans); font-size: 13px;
+    padding: 16px 20px; text-align: left;
+    border-radius: 2px; transition: all 0.25s;
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .option-btn:hover { border-color: var(--accent2); background: var(--bg3); }
+
+  .option-btn.selected {
+    border-color: var(--accent);
+    background: rgba(201,169,110,0.08);
+    color: var(--accent);
+  }
+
+  .option-icon {
+    font-size: 18px; width: 24px; text-align: center;
+  }
+
+  /* 입력 필드 */
+  .input-field {
+    width: 100%; background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text); font-family: var(--sans);
+    font-size: 15px; padding: 16px 20px;
+    border-radius: 2px; outline: none;
+    transition: border-color 0.3s;
+  }
+
+  .input-field:focus { border-color: var(--accent); }
+  .input-field::placeholder { color: var(--muted); }
+
+  .input-row { display: flex; gap: 8px; }
+  .input-row .input-field { flex: 1; }
+
+  /* 범위 슬라이더 */
+  .range-container { padding: 8px 0; }
+
+  .range-labels {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); margin-bottom: 12px;
+  }
+
+  input[type=range] {
+    width: 100%; appearance: none;
+    height: 2px; background: var(--border);
+    border-radius: 0; outline: none; cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none; width: 20px; height: 20px;
+    background: var(--accent); border-radius: 50%;
+    border: 3px solid var(--bg); cursor: pointer;
+  }
+
+  .range-value {
+    text-align: center; margin-top: 16px;
+    font-family: var(--mono); font-size: 24px;
+    color: var(--accent);
+  }
+
+  /* 체크박스 */
+  .checkbox-label {
+    display: flex; align-items: flex-start; gap: 12px;
+    cursor: pointer; font-size: 13px; color: var(--muted);
+    line-height: 1.6; padding: 4px 0;
+  }
+
+  .checkbox-label input { display: none; }
+
+  .custom-check {
+    width: 16px; height: 16px; min-width: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg); position: relative; margin-top: 2px;
+  }
+
+  .checkbox-label input:checked + .custom-check {
+    background: var(--accent); border-color: var(--accent);
+  }
+
+  .checkbox-label input:checked + .custom-check::after {
+    content: '✓'; position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 10px; color: #080808;
+  }
+
+  /* 내비게이션 */
+  .survey-nav {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-top: 40px;
+  }
+
+  .btn-back {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-family: var(--sans); font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+    transition: color 0.2s;
+  }
+
+  .btn-back:hover { color: var(--text); }
+
+  .btn-next {
+    background: var(--accent); color: #080808;
+    border: none; cursor: pointer;
+    font-family: var(--sans); font-size: 13px;
+    font-weight: 500; letter-spacing: 1px;
+    padding: 14px 32px; border-radius: 2px;
+    transition: all 0.3s;
+  }
+
+  .btn-next:hover { background: #d4b47a; transform: translateY(-1px); }
+  .btn-next:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  /* 완료 화면 */
+  .complete-screen {
+    display: none; text-align: center; padding: 48px 0;
+    animation: fadeUp 0.6s ease;
+  }
+
+  .complete-screen.active { display: block; }
+
+  .complete-icon {
+    width: 64px; height: 64px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 28px;
+    font-size: 24px;
+  }
+
+  .complete-title {
+    font-family: var(--serif); font-size: 28px;
+    font-weight: 300; margin-bottom: 16px;
+  }
+
+  .complete-desc {
+    font-size: 14px; color: var(--muted);
+    line-height: 1.8; margin-bottom: 36px;
+  }
+
+  .result-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 24px; margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .result-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .result-row:last-child { border-bottom: none; }
+  .result-key { color: var(--muted); }
+  .result-val { color: var(--text); font-family: var(--mono); }
+
+  /* ── TRUST SECTION ── */
+  .trust-section {
+    padding: 80px 24px;
+    max-width: 1000px; margin: 0 auto;
+    position: relative; z-index: 1;
+  }
+
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .trust-item {
+    background: var(--bg); padding: 32px 24px; text-align: center;
+  }
+
+  .trust-num {
+    font-family: var(--serif); font-size: 36px;
+    color: var(--accent); margin-bottom: 8px;
+  }
+
+  .trust-label { font-size: 12px; color: var(--muted); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 32px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px;
+    position: relative; z-index: 1;
+  }
+
+  .footer-logo {
+    font-family: var(--serif); font-size: 14px;
+    letter-spacing: 3px; color: var(--accent);
+  }
+
+  .footer-info {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); line-height: 1.8;
+  }
+
+  /* ── 토스트 ── */
+  .toast {
+    position: fixed; bottom: 32px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px;
+    padding: 12px 24px; border-radius: 2px;
+    opacity: 0; transition: all 0.4s;
+    z-index: 999; white-space: nowrap;
+  }
+
+  .toast.show {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
+
+  .toast.success { border-color: rgba(90,170,122,0.4); color: var(--success); }
+  .toast.error   { border-color: rgba(224,90,90,0.4);  color: var(--danger);  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; }
+    50%       { opacity: 1; }
+  }
+
+  /* ── MOBILE ── */
+  @media (max-width: 600px) {
+    header { padding: 16px 20px; }
+    .section { padding: 60px 20px; }
+    .survey-section { padding: 60px 20px; }
+    .options-grid { grid-template-columns: 1fr; }
+    .input-row { flex-direction: column; }
+    footer { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <a href="#" class="logo">INTER<span>MARRY</span></a>
+  <div class="header-badge">POWERED BY BRAINPOOL</div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">INTERNATIONAL MARRIAGE · NEW STANDARD</div>
+  <h1 class="hero-title">
+    결혼하라고 하지 않습니다.<br>
+    <em>먼저 확인하세요.</em>
+  </h1>
+  <p class="hero-sub">
+    비행기 값 쓰기 전, 3만원으로 나의 매칭 확률을 먼저 확인하세요.<br>
+    모든 가격은 정찰제. 모든 과정은 투명하게.
+  </p>
+  <div class="hero-cta">
+    <button class="btn-primary" onclick="scrollToSurvey()">무료 적성 진단 시작</button>
+    <button class="btn-ghost" onclick="scrollToProducts()">상품 보기</button>
+  </div>
+  <div class="scroll-hint">
+    <span>SCROLL</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- TRUST NUMBERS -->
+<div class="trust-section">
+  <div class="trust-grid">
+    <div class="trust-item">
+      <div class="trust-num">15년</div>
+      <div class="trust-label">국제결혼 데이터 축적</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">3만원</div>
+      <div class="trust-label">첫 시작 비용</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">정찰제</div>
+      <div class="trust-label">깜깜이 견적 없음</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">100%</div>
+      <div class="trust-label">상담 전환 시 포인트 페이백</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCTS -->
+<section class="section" id="products">
+  <div class="section-label">PRODUCT LINE-UP</div>
+  <h2 class="section-title">부담 없이 시작하는<br>3단계 체험 상품</h2>
+  <div class="products-grid">
+    <div class="product-card featured" onclick="scrollToSurvey()">
+      <span class="product-tag">STEP 01 · 진단형</span>
+      <div class="product-name">국제결혼 적성검사</div>
+      <p class="product-desc">나의 성향에 맞는 국가·여성 스타일 분석. 15년 데이터 기반 성혼 가능성 진단 리포트 제공.</p>
+      <div class="product-price">₩30,000 <small>상담 전환 시 100% 페이백</small></div>
+    </div>
+    <div class="product-card" onclick="scrollToSurvey()">
+      <span class="product-tag">STEP 02 · 체험형</span>
+      <div class="product-name">1:1 온택트 화상 미팅</div>
+      <p class="product-desc">현지 여성과 화상 상견례 1회권. 전문 통역사 배정. 항공료 없이 집에서 먼저 확인.</p>
+      <div class="product-price">₩50,000 <small>통역 포함</small></div>
+    </div>
+    <div class="product-card" onclick="scrollToSurvey()">
+      <span class="product-tag">STEP 03 · 실속형</span>
+      <div class="product-name">현지 맞선 여행</div>
+      <p class="product-desc">5박 6일 현지 체류 및 맞선 진행. 성혼 강요 없는 여행 겸 맞선 컨셉. 미성사 시 1:1 컨설팅 제공.</p>
+      <div class="product-price">₩990,000 <small>항공료 별도</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- SURVEY -->
+<section class="survey-section" id="survey">
+  <div class="survey-inner">
+    <div class="section-label" style="margin-bottom:12px;">MATCHING DIAGNOSIS</div>
+    <h2 class="section-title" style="margin-bottom:32px;">
+      3분으로 알아보는<br>나의 매칭 적성
+    </h2>
+
+    <!-- 진행 표시 -->
+    <div class="step-indicator" id="stepIndicator"></div>
+
+    <!-- STEP 1: 나이/이름/연락처 -->
+    <div class="survey-step active" id="step1">
+      <div class="survey-question">먼저 기본 정보를 알려주세요</div>
+      <div class="survey-hint">수집된 정보는 매칭 분석에만 사용됩니다</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="input-row">
+          <input type="text" id="s_name" class="input-field" placeholder="성함">
+          <input type="number" id="s_age" class="input-field" placeholder="나이" style="max-width:120px;" min="20" max="70">
+        </div>
+        <input type="tel" id="s_phone" class="input-field" placeholder="연락처 (010-0000-0000)">
+      </div>
+      <div class="survey-nav">
+        <div></div>
+        <button class="btn-next" onclick="nextStep(1)">다음 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: 결혼 의향 -->
+    <div class="survey-step" id="step2">
+      <div class="survey-question">결혼에 대한 의향은 어느 정도인가요?</div>
+      <div class="survey-hint">솔직하게 선택해주세요. 정답은 없습니다</div>
+      <div class="range-container">
+        <div class="range-labels">
+          <span>그냥 궁금해서</span>
+          <span>진지하게 준비 중</span>
+        </div>
+        <input type="range" id="s_intent" min="1" max="5" value="3" oninput="updateRange(this)">
+        <div class="range-value" id="rangeDisplay">3 / 5</div>
+      </div>
+      <div class="survey-nav">
+        <button class="btn-back" onclick="prevStep(2)">← 이전</button>
+        <button class="btn-next" onclick="nextStep(2)">다음 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: 예산 -->
+    <div class="survey-step" id="step3">
+      <div class="survey-question">예상 투자 가능 예산은?</div>
+      <div class="survey-hint">비용 부담 없이 솔직하게 선택해주세요</div>
+      <div class="options-grid">
+        <button class="option-btn" onclick="selectOption(this,'s_budget','500만원 미만')">
+          <span class="option-icon">💡</span> 500만원 미만
+        </button>
+        <button class="option-btn" onclick="selectOption(this,'s_budget','500~1000만원')">
+          <span class="option-icon">📋</span> 500~1000만원
+        </button>
+        <button class="option-btn" onclick="selectOption(this,'s_budget','1000~1500만원')">
+          <span class="option-icon">⭐</span> 1000~1500만원
+        </button>
+        <button class="option-btn" onclick="selectOption(this,'s_budget','2000만원 이상')">
+          <span class="option-icon">👑</span> 2000만원 이상
+        </button>
+      </div>
+      <div class="survey-nav">
+        <button class="btn-back" onclick="prevStep(3)">← 이전</button>
+        <button class="btn-next" id="nextBtn3" onclick="nextStep(3)" disabled>다음 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: 관심 국가 -->
+    <div class="survey-step" id="step4">
+      <div class="survey-question">관심 있는 국가는?</div>
+      <div class="survey-hint">복수 선택 가능합니다</div>
+      <div class="options-grid">
+        <button class="option-btn" onclick="toggleMulti(this,'s_country','베트남')">
+          <span class="option-icon">🇻🇳</span> 베트남
+        </button>
+        <button class="option-btn" onclick="toggleMulti(this,'s_country','캄보디아')">
+          <span class="option-icon">🇰🇭</span> 캄보디아
+        </button>
+        <button class="option-btn" onclick="toggleMulti(this,'s_country','러시아')">
+          <span class="option-icon">🇷🇺</span> 러시아
+        </button>
+        <button class="option-btn" onclick="toggleMulti(this,'s_country','일본')">
+          <span class="option-icon">🇯🇵</span> 일본
+        </button>
+      </div>
+      <div class="survey-nav">
+        <button class="btn-back" onclick="prevStep(4)">← 이전</button>
+        <button class="btn-next" onclick="nextStep(4)">다음 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: 걱정되는 것 -->
+    <div class="survey-step" id="step5">
+      <div class="survey-question">가장 걱정되는 부분은?</div>
+      <div class="survey-hint">해당하는 것을 모두 선택해주세요</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <label class="checkbox-label">
+          <input type="checkbox" value="사기 피해" onchange="toggleConcern(this)">
+          <span class="custom-check"></span>
+          사기 피해가 걱정된다
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="언어 소통" onchange="toggleConcern(this)">
+          <span class="custom-check"></span>
+          언어 소통이 불안하다
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="높은 비용" onchange="toggleConcern(this)">
+          <span class="custom-check"></span>
+          한 번에 큰돈 쓰기 부담스럽다
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="문화 차이" onchange="toggleConcern(this)">
+          <span class="custom-check"></span>
+          문화 차이가 걱정된다
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="주변 시선" onchange="toggleConcern(this)">
+          <span class="custom-check"></span>
+          주변 시선이 신경 쓰인다
+        </label>
+      </div>
+      <div class="survey-nav">
+        <button class="btn-back" onclick="prevStep(5)">← 이전</button>
+        <button class="btn-next" onclick="submitSurvey()">결과 확인 →</button>
+      </div>
+    </div>
+
+    <!-- 완료 화면 -->
+    <div class="complete-screen" id="completeScreen">
+      <div class="complete-icon">✦</div>
+      <h3 class="complete-title">분석이 완료되었습니다</h3>
+      <p class="complete-desc">
+        담당 매니저가 24시간 이내에 연락드립니다.<br>
+        지금 바로 CoreChat으로 베트남어를 경험해보세요.
+      </p>
+      <div class="result-card" id="resultCard"></div>
+      <button class="btn-primary" onclick="openCoreChat()" style="width:100%; margin-bottom:12px;">
+        CoreChat 무료 체험 시작
+      </button>
+      <button class="btn-ghost" onclick="goToIntermarry()" style="width:100%;">
+        인터메리 전체 상품 보기
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">INTERMARRY</div>
+  <div class="footer-info">
+    국제결혼중개업 신고업체 · 결혼중개업법 준수<br>
+    POWERED BY BRAINPOOL · CoreChat 번역 엔진 탑재
+  </div>
+</footer>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIG — 실제 값으로 교체
+// ══════════════════════════════════════════════
+
+const SUPABASE_URL="https://grlfocvlfatuvphkyivd.supabase.co"
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGZvY3ZsZmF0dXZwaGt5aXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzNDM1MzksImV4cCI6MjA4NTkxOTUzOX0.4dLzD1AYSuigxU_Q5ZZwZ6XDGejMvbuoYIjmB4D7dxo"
+
+// ══════════════════════════════════════════════
+// UTM 파라미터 수집
+// ══════════════════════════════════════════════
+const params = new URLSearchParams(window.location.search);
+const UTM = {
+  source:  params.get('utm_source')  || 'direct',
+  medium:  params.get('utm_medium')  || '',
+  content: params.get('utm_content') || '',
+};
+
+// ══════════════════════════════════════════════
+// 설문 상태
+// ══════════════════════════════════════════════
+const TOTAL_STEPS = 5;
+let currentStep = 1;
+
+const surveyData = {
+  name:     '',
+  age:      null,
+  phone:    '',
+  intent:   3,
+  budget:   '',
+  country:  [],
+  concerns: [],
+};
+
+// ── Step 인디케이터 생성 ──
+function buildIndicator() {
+  const el = document.getElementById('stepIndicator');
+  el.innerHTML = '';
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'step-dot' +
+      (i < currentStep ? ' done' : i === currentStep ? ' active' : '');
+    el.appendChild(dot);
+  }
+}
+buildIndicator();
+
+// ── 스크롤 유틸 ──
+function scrollToSurvey()   { document.getElementById('survey').scrollIntoView({ behavior:'smooth' }); }
+function scrollToProducts() { document.getElementById('products').scrollIntoView({ behavior:'smooth' }); }
+
+// ── 범위 슬라이더 ──
+function updateRange(el) {
+  surveyData.intent = parseInt(el.value);
+  document.getElementById('rangeDisplay').textContent = el.value + ' / 5';
+}
+
+// ── 단일 선택 ──
+function selectOption(btn, key, val) {
+  btn.closest('.options-grid').querySelectorAll('.option-btn')
+    .forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  surveyData[key] = val;
+  // 다음 버튼 활성화
+  const nextBtnId = 'nextBtn' + currentStep;
+  const nb = document.getElementById(nextBtnId);
+  if (nb) nb.disabled = false;
+}
+
+// ── 복수 선택 ──
+function toggleMulti(btn, key, val) {
+  btn.classList.toggle('selected');
+  if (btn.classList.contains('selected')) {
+    if (!surveyData[key]) surveyData[key] = [];
+    surveyData[key].push(val);
+  } else {
+    surveyData[key] = surveyData[key].filter(v => v !== val);
+  }
+}
+
+// ── 체크박스 ──
+function toggleConcern(cb) {
+  if (cb.checked) {
+    surveyData.concerns.push(cb.value);
+  } else {
+    surveyData.concerns = surveyData.concerns.filter(v => v !== cb.value);
+  }
+}
+
+// ── 다음 단계 ──
+function nextStep(from) {
+  // 유효성 검사
+  if (from === 1) {
+    const name  = document.getElementById('s_name').value.trim();
+    const age   = document.getElementById('s_age').value;
+    const phone = document.getElementById('s_phone').value.trim();
+    if (!name || !age || !phone) { showToast('모든 항목을 입력해주세요', 'error'); return; }
+    surveyData.name  = name;
+    surveyData.age   = parseInt(age);
+    surveyData.phone = phone;
+  }
+
+  document.getElementById('step' + from).classList.remove('active');
+  currentStep = from + 1;
+  document.getElementById('step' + currentStep).classList.add('active');
+  buildIndicator();
+  document.getElementById('survey').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── 이전 단계 ──
+function prevStep(from) {
+  document.getElementById('step' + from).classList.remove('active');
+  currentStep = from - 1;
+  document.getElementById('step' + currentStep).classList.add('active');
+  buildIndicator();
+}
+
+// ══════════════════════════════════════════════
+// 제출 + Supabase 저장
+// ══════════════════════════════════════════════
+async function submitSurvey() {
+    const payload = {
+    name:        surveyData.name,
+    age:         surveyData.age,
+    phone:       surveyData.phone,
+    intent:      surveyData.intent,
+    budget:      surveyData.budget,
+    country:     surveyData.country.join(','),
+    concerns:    surveyData.concerns.join(','),
+    utm_source:  UTM.source,
+    utm_medium:  UTM.medium,
+    utm_content: UTM.content,
+    client_id:   'intermarry',
+    paid:        false,
+    converted:   false,
+    chat_started:false,
+};
+
+  // ── Supabase REST API 직접 호출 (SDK 없이) ──
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':         SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Prefer':         'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error('저장 실패');
+    showToast('분석 완료! 담당자가 곧 연락드립니다 ✦', 'success');
+  } catch (e) {
+    // 저장 실패해도 UX는 계속 진행 (오프라인 등 대비)
+    console.warn('[Lead Save]', e.message);
+  }
+
+  // 완료 화면 표시
+  document.getElementById('step5').classList.remove('active');
+
+  const matchScore = calcMatchScore();
+  document.getElementById('resultCard').innerHTML = `
+    <div class="result-row">
+      <span class="result-key">이름</span>
+      <span class="result-val">${surveyData.name}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">결혼 의향 점수</span>
+      <span class="result-val">${surveyData.intent} / 5</span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">관심 국가</span>
+      <span class="result-val">${surveyData.country.join(', ') || '미선택'}</span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">예상 매칭 확률</span>
+      <span class="result-val" style="color:var(--accent); font-size:18px;">${matchScore}%</span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">추천 상품</span>
+      <span class="result-val">${getRecommendedProduct()}</span>
+    </div>
+  `;
+
+  document.getElementById('completeScreen').classList.add('active');
+  document.getElementById('stepIndicator').style.display = 'none';
+  document.getElementById('survey').scrollIntoView({ behavior:'smooth' });
+}
+
+// ── 간단한 매칭 점수 계산 (실제는 서버 로직으로) ──
+function calcMatchScore() {
+  let score = 60;
+  score += (surveyData.intent - 1) * 5;
+  if (surveyData.budget === '1000~1500만원') score += 8;
+  if (surveyData.budget === '2000만원 이상') score += 12;
+  if (surveyData.country.includes('베트남')) score += 5;
+  score = Math.min(97, Math.max(55, score));
+  return score;
+}
+
+function getRecommendedProduct() {
+  const intent = surveyData.intent;
+  if (intent <= 2) return '국제결혼 적성검사 (₩30,000)';
+  if (intent <= 3) return '1:1 화상 미팅 (₩50,000)';
+  return '현지 맞선 여행 (₩990,000)';
+}
+
+// ── 외부 링크 ──
+function openCoreChat()   { window.open('https://corering.brainpool.kr', '_blank'); }
+function goToIntermarry() { window.open('https://intermarry.kr', '_blank'); }
+
+// ══════════════════════════════════════════════
+// 토스트
+// ══════════════════════════════════════════════
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ══════════════════════════════════════════════
+// Intersection Observer (스크롤 진입 애니메이션)
+// ══════════════════════════════════════════════
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.style.opacity = '1';
+      e.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.product-card, .trust-item').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(24px)';
+  el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>

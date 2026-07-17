@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CORE-RING ENGINE</title>
+    <meta property="og:title" content="한↔베 방언 번역기 · CoreRing">
+    <meta property="og:description" content="한국어 ↔ 베트남어, 사투리까지 번역돼요 🗣️ 남북 방언 자동 감지 · 감정 톤 분석">
+    <meta property="og:url" content="https://corering.vercel.app">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://corering.vercel.app/icon-512.png">
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="ring.css">
+    <link rel="stylesheet" href="chat.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CORERING">
+    <style>
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        #install-btn {
+            background: none; border: none;
+            cursor: pointer; color: currentColor;
+            padding: 0 0px; display: flex; align-items: center;
+        }
+        #install-btn.pwa-ready svg { stroke: #f0b429; }
+        #room-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <header id="header">
+        <div class="header-top">
+            <div class="logo-area">
+                <a href="/" style="text-decoration:none;">
+                    <span class="logo-core">CORE</span><span class="logo-ring">RING</span>
+                </a>
+            </div>
+            <div style="display:flex; align-items:center; gap:14px;">
+
+                <!-- ROOM 토글 스위치 -->
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span id="toggle-label" style="font-size:9px; color:#999; letter-spacing:1.5px; font-family:monospace;">ROOM</span>
+                    <label style="position:relative; width:36px; height:20px; cursor:pointer; display:block;">
+                        <input type="checkbox" id="room-toggle" style="opacity:0; position:absolute; width:0; height:0;">
+                        <div id="toggle-track" style="position:absolute; inset:0; background:#222; border-radius:20px; border:0.5px solid rgba(255,255,255,0.1); transition:background 0.25s, border-color 0.25s;"></div>
+                        <div id="toggle-thumb" style="position:absolute; top:3px; left:3px; width:14px; height:14px; background:#555; border-radius:50%; transition:transform 0.25s, background 0.25s; pointer-events:none;"></div>
+                    </label>
+                </div>
+
+                <!-- 대화 삭제 -->
+                <button id="clear-btn" aria-label="대화 삭제" style="background:none; border:none; cursor:pointer; color:#555; padding:0; display:flex; align-items:center; transition:color 0.2s;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        <path d="M10 11v6M14 11v6"></path>
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                    </svg>
+                </button>
+
+                <!-- 홈 화면 추가 -->
+                <button id="install-btn" aria-label="홈 화면에 추가">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M12 2v13M7 10l5 5 5-5"/>
+                        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+                    </svg>
+                </button>
+
+                <!-- 공유 -->
+                <button id="share-btn" style="background:none; border:none; cursor:pointer; color:currentColor; padding:0; display:flex; align-items:center;" aria-label="공유">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+
+            </div>
+        </div>
+        <div class="morse-r" id="morse-logo">
+            <div class="m-dot"></div><div class="m-dash"></div><div class="m-dot"></div>
+        </div>
+    </header>
+
+    <main id="chat-history"></main>
+
+    <!-- Chat Room Layer -->
+    <div id="room-layer" style="position:fixed; top:60px; left:0; right:0; bottom:70px; background:#0a0a0a; display:none; overflow-y:auto; z-index:50;">
+        <div id="room-list" style="padding:20px;"></div>
+    </div>
+
+    <!-- 하단 ROOM BAR (CHAT 모드 시만 노출) -->
+    <div id="room-bar" style="display:none; background:#0f0f0f; border-top:0.5px solid rgba(255,255,255,0.06); padding:8px 16px; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button id="nickname-display-btn" onclick="changeNickname()" style="background:none; border:none; cursor:pointer; color:#888; font-family:monospace; font-size:11px; padding:0;">✎ <span id="bar-nickname">익명</span></button>
+            <button id="room-code-btn" onclick="copyRoomCode()" style="background:#1a2a1a; border:0.5px solid #2a3a2a; border-radius:10px; color:#5c9e5c; font-family:monospace; font-size:11px; padding:2px 8px; cursor:pointer;">● <span id="bar-room-code">------</span></button>
+        </div>
+        <button id="exit-chat-btn" onclick="exitChatMode()" style="background:none; border:none; cursor:pointer; color:#444; display:flex; align-items:center; transition:color 0.2s;" title="나가기">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+        </button>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div id="modal-body"></div>
+            <button id="modal-close">확인</button>
+        </div>
+    </div>
+
+    <footer>
+        <input type="text" id="userInput" class="input-box" placeholder="심장을 분석합니다..." autocomplete="off">
+        <button id="send-btn" class="btn-send">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
+    </footer>
+
+<!-- 기존 전통 스크립트들 그대로 -->
+<script src="public/js/core/dialect.js"></script>
+<script src="public/js/core/conflict.js"></script>
+<script src="public/js/core/logger.js"></script>
+<script src="public/js/core/mindworld.js"></script>
+<script src="public/js/rooms.js"></script>
+
+<script src="/public/js/core/flow-translate.js"></script>
+<script src="engine.js"></script>
+
+<script src="public/js/core/pipeline.js"></script>
+<script src="public/js/share.js"></script>
+<script src="public/js/install.js"></script>
+<script src="public/js/locale-setup.js"></script>
+<script src="https://hajunai-v2.vercel.app/js/brainpool-debug.js"></script>
+</body>
+</html>
