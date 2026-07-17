@@ -160,10 +160,7 @@ export default function CorePhrase({ userId }: CorePhraseProps) {
               <p className={styles.flipLabel}>베트남어</p>
               <p className={styles.flipWord}>{currentCard?.word}</p>
               <p className={styles.flipHint}>탭해서 한국어 확인</p>
-              <button
-                onClick={(e) => { e.stopPropagation(); if (typeof window !== 'undefined' && window.speechSynthesis) { const u = new SpeechSynthesisUtterance(currentCard?.word || ''); u.lang = 'vi-VN'; u.rate = 0.9; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '24px', marginTop: '8px' }}
-              >🔊</button>
+
             </div>
             <div className={styles.flipBack}>
               <p className={styles.flipLabel}>한국어</p>
