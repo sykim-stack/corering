@@ -22,7 +22,7 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 1pxvar(--space-1);
   height: var(--touch-min-height);
 }
 
