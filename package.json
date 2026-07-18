@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.105.1",
+    "@supabase/supabase-js": "2.108.0",
     "axios": "^1.15.2",
     "brainpool-os": "file:../../brainpool-os",
     "cloudinary": "^2.10.0",
