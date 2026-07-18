@@ -158,7 +158,10 @@ export default function CorePhrase({ userId }: CorePhraseProps) {
           <div className={styles.flipInner}>
             <div className={styles.flipFront}>
               <p className={styles.flipLabel}>베트남어</p>
-              <p className={styles.flipWord}>{currentCard?.word}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <p className={styles.flipWord} style={{ margin: 0 }}>{currentCard?.word}</p>
+                <button onClick={(e) => { e.stopPropagation(); if (typeof window !== 'undefined' && window.speechSynthesis) { const u = new SpeechSynthesisUtterance(currentCard?.word || ''); u.lang = 'vi-VN'; u.rate = 0.9; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', flexShrink: 0 }}>🔊</button>
+              </div>
               <p className={styles.flipHint}>탭해서 한국어 확인</p>
 
             </div>
