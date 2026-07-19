@@ -101,7 +101,7 @@ const fetchDailyWord = async (): Promise<DailyWord & { _error?: string }> => {
 };
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
-export default function Home() {
+export default function Home({ initialRoomId }: { initialRoomId?: string } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [rooms,          setRooms]          = useState<Room[]>([]);
   const [currentRoomId,  setCurrentRoomId]  = useState<string | null>(null);
@@ -118,11 +118,12 @@ export default function Home() {
   const [dailyWord,      setDailyWord]      = useState<DailyWord>({
     word: 'xin chào', meaning: '안녕하세요',
     usage: '처음 만나는 사람에게 쓰는 베트남어 인사',
-    culturalNote: '남부에서는 "chào" 만으로도 자연스럽습니다',
+    culturalNote: '남부에서는 "chào" 만으로도 자연스러워요',
   });
   const [showDaily, setShowDaily]   = useState(true);
   const [showRoomBanner, setShowRoomBanner] = useState(false);
   const [shareRoomCode, setShareRoomCode] = useState<string | null>(null);
+  const [shareRoomId, setShareRoomId] = useState<string | null>(null);
   const [langHistory, setLangHistory] = useState<string[]>([]);
   const [activeTab, setActiveTab]   = useState<'ring' | 'phrase'>('ring');
   const [myRooms,   setMyRooms]     = useState<Room[]>(() => {
@@ -378,8 +379,22 @@ export default function Home() {
     }
   }, []);
 
-  // -- URL 딥링크 처리 (초대링크 ?code=, 알림 ?room=) -----------------
+  // -- URL 딥링크 처리 (초대링크 ?code=, 알림 ?room=, SEO /rooms/{id}) -----------------
   useEffect(() => {
+  if (initialRoomId) {
+    (async () => {
+      const res = await fetch('/api/chat/rooms/' + initialRoomId).catch(() => null);
+      const data = res ? await res.json().catch(() => null) : null;
+      if (data?.payload?.room) {
+        setMessages([]);
+        setCurrentRoomId(data.payload.room.roomId);
+        setCurrentRoomCode(data.payload.room.inviteCode || '------');
+        saveMyRoom(data.payload.room);
+      }
+    })();
+    return;
+  }
+
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const roomParam = params.get('room');
@@ -389,7 +404,7 @@ export default function Home() {
     window.history.replaceState({}, '', window.location.pathname);
   } else if (roomParam) {
     (async () => {
-      const res = await fetch(`/api/chat/rooms/${roomParam}`).catch(() => null);
+      const res = await fetch('/api/chat/rooms/' + roomParam).catch(() => null);
       const data = res ? await res.json().catch(() => null) : null;
       if (data?.payload?.room) {
         setMessages([]);
@@ -400,7 +415,7 @@ export default function Home() {
       window.history.replaceState({}, '', window.location.pathname);
     })();
   }
-}, []); // eslint-disable-line react-hooks/exhaustive-deps
+}, [initialRoomId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 방 삭제 ───────────────────────────────────────────────────────
   const handleDeleteRoom = useCallback(async (roomId: string) => {
@@ -530,6 +545,7 @@ export default function Home() {
             setCurrentRoomCode(data.payload.room.inviteCode || '------');
             saveMyRoom(data.payload.room);
             setShareRoomCode(data.payload.room.inviteCode || null);
+            setShareRoomId(data.payload.room.roomId || null);
             setIsRoomMode(false);
           }
         }}
@@ -661,10 +677,11 @@ export default function Home() {
         </div>
       )}
 
-      {shareRoomCode && (
+      {shareRoomCode && shareRoomId && (
         <ShareRoomModal
+          roomId={shareRoomId}
           roomCode={shareRoomCode}
-          onClose={() => setShareRoomCode(null)}
+          onClose={() => { setShareRoomCode(null); setShareRoomId(null); }}
         />
       )}
 
