@@ -1,4 +1,8 @@
-import { getRoomMetadata } from '@/lib/seo/room';
+// patch_seo_jsonld.cjs
+const fs = require('fs');
+const path = "app/rooms/[roomId]/page.tsx";
+
+const newContent = `import { getRoomMetadata } from '@/lib/seo/room';
 import { getSupabase } from '@/lib/supabase';
 import { BASE_URL } from '@/lib/seo/shared';
 import Home from '@/app/page'; // default export 재사용
@@ -31,7 +35,7 @@ async function getRoomJsonLd(roomId: string) {
       '@context': 'https://schema.org',
       '@type': 'DiscussionForumPosting',
       headline: room.room_name || 'CoreRing 채팅방',
-      url: `${BASE_URL}/rooms/${roomId}`,
+      url: \`\${BASE_URL}/rooms/\${roomId}\`,
       inLanguage: ['ko', 'vi'],
     };
   } catch {
@@ -54,4 +58,19 @@ export default async function RoomPage({ params }: { params: Promise<{ roomId: s
       <Home initialRoomId={roomId} />
     </>
   );
+}
+`;
+
+if (!fs.existsSync(path)) {
+  console.log('X 파일이 존재하지 않음: ' + path);
+  process.exit(1);
+}
+
+const current = fs.readFileSync(path, 'utf8');
+
+if (current.includes('DiscussionForumPosting')) {
+  console.log('SKIP: 이미 JSON-LD가 적용되어 있음');
+} else {
+  fs.writeFileSync(path, newContent, 'utf8');
+  console.log('OK: app/rooms/[roomId]/page.tsx에 JSON-LD 추가 완료');
 }

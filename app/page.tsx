@@ -117,7 +117,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
   const [firstLanguage,  setFirstLanguage]  = useState<string | null>(null);
   const [dailyWord,      setDailyWord]      = useState<DailyWord>({
     word: 'xin chào', meaning: '안녕하세요',
-    usage: '처음 만나는 사람에게 쓰는 베트남어 인사',
+    usage: '처음 만나는 사람에게 쓰는 인사',
     culturalNote: '남부에서는 "chào" 만으로도 자연스러워요',
   });
   const [showDaily, setShowDaily]   = useState(true);
