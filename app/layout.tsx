@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './core.css';
+import { getAppJsonLd } from '@/lib/seo/shared';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -31,6 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(getAppJsonLd()) }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) {
