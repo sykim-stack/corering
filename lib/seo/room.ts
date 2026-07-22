@@ -39,13 +39,14 @@ export async function getRoomMetadata(roomId: string): Promise<Metadata> {
         type: 'website',
         images: [
           {
-            url: `/api/og?room=${slug}`,  // 여기서 slug 변수가 유효한지 확인
+            url: `/api/og?room=${roomId}`,
             width: 1200,
             height: 630,
             alt: `${title} | CoreLife Village`,
           },
         ],
-      },
+      },   // ← 여기 반드시 쉼표(,)와 함께 닫아야 함
+    };
   } catch {
     return noindexMetadata; // fail-safe
   }
