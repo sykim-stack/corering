@@ -139,8 +139,15 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
       const audio = new Audio(audioUrl);
       audio.play().catch(() => { window.open(audioUrl, '_blank'); });
     } else if (typeof window !== 'undefined' && window.speechSynthesis && meaning) {
+      const targetLang = sourceLang === 'ko' ? 'vi-VN' : 'ko-KR';
+      const voices = window.speechSynthesis.getVoices();
+      const hasVoice = voices.some(v => v.lang === targetLang || v.lang.startsWith(targetLang.split('-')[0]));
+      if (voices.length > 0 && !hasVoice) {
+        alert('이 기기에는 ' + (targetLang === 'vi-VN' ? '베트남어' : '한국어') + ' 음성이 설치되어 있지 않아요. 설정 > 손쉬운 사용 > 음성 콘텐츠에서 추가할 수 있어요.');
+        return;
+      }
       const utterance = new SpeechSynthesisUtterance(meaning);
-      utterance.lang = sourceLang === 'ko' ? 'vi-VN' : 'ko-KR';
+      utterance.lang = targetLang;
       utterance.rate = 0.9;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
@@ -176,6 +183,9 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
         try {
           const mType = recorder.mimeType || mimeType;
           const blob = new Blob(audioChunks.current, { type: mType });
+          if (blob.size <= 1000) {
+            alert('녹음이 제대로 저장되지 않았어요. 이 기기에서는 녹음 기능이 원활하지 않을 수 있습니다.');
+          }
           if (blob.size > 1000) {
             const url = await uploadVoice(blob, mType, userId || 'anon');
             if (url) {
@@ -204,6 +214,7 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
       setIsRecording(true);
     } catch (e) {
       console.warn('마이크 실패:', e);
+      alert('이 기기에서는 음성 녹음이 지원되지 않아요. 텍스트로 저장해주세요.');
     }
   };
 
