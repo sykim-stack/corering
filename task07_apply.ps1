@@ -3,7 +3,7 @@
 # 실행 위치: C:\brainpool-clean\brainpool-clean
 # ============================================================
 
-$ROOT = "C:\brainpool-clean\brainpool-clean"
+$ROOT = "g:\brainpool-clean"
 Set-Location $ROOT
 
 Write-Host "TASK-07 시작: iOS 기기 제약 안내 추가" -ForegroundColor Cyan
