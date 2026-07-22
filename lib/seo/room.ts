@@ -37,8 +37,15 @@ export async function getRoomMetadata(roomId: string): Promise<Metadata> {
         description,
         url: canonicalUrl,
         type: 'website',
+        images: [
+          {
+            url: `/api/og?room=${slug}`,  // 여기서 slug 변수가 유효한지 확인
+            width: 1200,
+            height: 630,
+            alt: `${title} | CoreLife Village`,
+          },
+        ],
       },
-    };
   } catch {
     return noindexMetadata; // fail-safe
   }
