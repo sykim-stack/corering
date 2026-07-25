@@ -255,6 +255,11 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
         const data = await res.json().catch(() => null);
         if (cancelled || !data) return;
 
+        if (data._error === 'ROOM_DELETED') {
+          alert('이 방은 삭제되었습니다.');
+          handleExitRoom();
+          return;
+        }
         const rawMsgs = data.payload?.messages || [];
         if (!rawMsgs.length) return;
 
@@ -307,11 +312,16 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
 
   // ── 메시지 전송: /api/chat POST action=send ──────────────────────
   const sendMessageToRoom = async (roomId: string, text: string) => {
-    await fetch('/api/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify({ action: 'send', roomId, userId: deviceId, original: text, analyze: true }),
-    }).catch(err => console.error('메시지 전송 실패:', err));
+    }).catch(err => { console.error('메시지 전송 실패:', err); return null; });
+    const data = res ? await res.json().catch(() => null) : null;
+    if (data?._error === 'ROOM_DELETED') {
+      alert('이 방은 삭제되었습니다.');
+      handleExitRoom();
+    }
   };
 
   // ── 방 생성: /api/chat POST action=create ────────────────────────

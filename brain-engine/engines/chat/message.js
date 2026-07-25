@@ -10,6 +10,10 @@ async function sendMessage(ctx) {
   if (!isUUID(roomId)) return { ...ctx, _error: 'roomId is not UUID: ' + roomId };
   const db = await getStorage();
   if (!db) return { ...ctx, _error: 'DB connection failed' };
+  const { data: roomCheck2 } = await db.from('chat_rooms').select('id').eq('id', roomId).maybeSingle();
+  if (!roomCheck2) return { ...ctx, _error: 'ROOM_DELETED', roomDeleted: true };
+  const { data: roomCheck } = await db.from('chat_rooms').select('id').eq('id', roomId).maybeSingle();
+  if (!roomCheck) return { ...ctx, _error: 'ROOM_DELETED', roomDeleted: true };
   // translations jsonb 구조: { ko: "...", vi: "...", en: null, ja: null }
   // ADR-002: messages.translations = 렌더링 편의용 Projection
   //          Language Knowledge의 Source of Truth = tb_trans_logs
