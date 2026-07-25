@@ -221,7 +221,31 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
     if (data?.payload?.rooms) setRooms(data.payload.rooms);
   }, [deviceId]);
 
+  // myRooms(localStorage 캐시)에 남아있는 방이 실제로 삭제됐는지 조용히 검증하고 정리
+  const validateMyRooms = useCallback(async () => {
+    setMyRooms(prev => {
+      if (prev.length === 0) return prev;
+      (async () => {
+        const checks = await Promise.all(
+          prev.map(async (room) => {
+            const res = await fetch('/api/chat/rooms/' + room.roomId).catch(() => null);
+            if (!res || !res.ok) return null;
+            const data = await res.json().catch(() => null);
+            return data?.payload?.room ? room : null;
+          })
+        );
+        const alive = checks.filter(Boolean) as Room[];
+        if (alive.length !== prev.length) {
+          setMyRooms(alive);
+          localStorage.setItem('myRooms', JSON.stringify(alive));
+        }
+      })();
+      return prev;
+    });
+  }, []);
+
   useEffect(() => { loadRooms(); }, [loadRooms]);
+  useEffect(() => { validateMyRooms(); }, [validateMyRooms]);
 
   // ── 푸시 ──────────────────────────────────────────────────────────
   useEffect(() => {
