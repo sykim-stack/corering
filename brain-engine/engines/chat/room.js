@@ -32,7 +32,7 @@ async function listRooms(ctx) {
   if (!supabase) return { ...ctx, _error: 'DB connection failed' };
   const { data, error } = await supabase.from('chat_rooms').select('*').eq('is_public', true).order('created_at', { ascending: false });
   if (error) return { ...ctx, _error: error.message };
-  return { ...ctx, rooms: (data || []).map(r => ({ roomId: r.id, inviteCode: r.invite_code, title: r.room_name, status: 'active', createdBy: r.metadata?.createdBy || 'anonymous', ownerDeviceId: r.owner_device_id, createdAt: r.created_at, updatedAt: r.created_at, messageCount: r.metadata?.messageCount || 0, participantCount: 0, maxParticipants: r.metadata?.maxParticipants || 100, tags: r.metadata?.tags || [] })) };
+ return { ...ctx, rooms: (data || []).map(r => ({ roomId: r.id, inviteCode: r.invite_code, title: r.room_name, status: 'active', createdBy: r.metadata?.createdBy || 'anonymous', ownerDeviceId: r.owner_device_id, createdAt: r.created_at, updatedAt: r.created_at, messageCount: r.metadata?.messageCount || 0, participantCount: 0, maxParticipants: r.metadata?.maxParticipants || 100, tags: r.metadata?.tags || [] })) };
 }
 
 async function clearMessages(ctx) {

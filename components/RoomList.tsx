@@ -152,6 +152,7 @@ export default function RoomList({ rooms, myRooms = [], onSelectRoom, onCreateRo
                 </div>
               )}
             </div>
+            {room.ownerDeviceId === deviceId && (
             <button
               className={styles.deleteBtn}
               onClick={(e) => { e.stopPropagation(); onDeleteRoom(room.roomId); }}

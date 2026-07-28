@@ -563,6 +563,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
       <RoomList
         rooms={rooms}
         myRooms={myRooms}
+        deviceId={deviceId}
         onSelectRoom={(id) => {
           const room = rooms.find(r => r.roomId === id) || myRooms.find(r => r.roomId === id);
           setMessages([]); // 채팅방 진입 시 번역기 기록 비움 (localStorage는 유지)
