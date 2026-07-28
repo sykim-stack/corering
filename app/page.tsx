@@ -563,7 +563,6 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
       <RoomList
         rooms={rooms}
         myRooms={myRooms}
-        deviceId={deviceId}
         onSelectRoom={(id) => {
           const room = rooms.find(r => r.roomId === id) || myRooms.find(r => r.roomId === id);
           setMessages([]); // 채팅방 진입 시 번역기 기록 비움 (localStorage는 유지)
@@ -572,22 +571,22 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
         }}
         onJoinByCode={handleJoinByCode}
         onCreateRoom={async (title: string, isPublic: boolean) => {
-              const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                body: JSON.stringify({ action: 'create', title, isPublic, createdBy: deviceId }),
-              }).catch(() => null);
-              const data = res ? await res.json().catch(() => null) : null;
-              if (data?.payload?.room) {
-                loadRooms();
-                setCurrentRoomId(data.payload.room.roomId);
-                setCurrentRoomCode(data.payload.room.inviteCode || '------');
-                saveMyRoom(data.payload.room);
-                setShareRoomCode(data.payload.room.inviteCode || null);
-                setShareRoomId(data.payload.room.roomId || null);
-                setIsRoomMode(false);
-              }
-            }}
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ action: 'create', title, isPublic }),
+          }).catch(() => null);
+          const data = res ? await res.json().catch(() => null) : null;
+          if (data?.payload?.room) {
+            loadRooms();
+            setCurrentRoomId(data.payload.room.roomId);
+            setCurrentRoomCode(data.payload.room.inviteCode || '------');
+            saveMyRoom(data.payload.room);
+            setShareRoomCode(data.payload.room.inviteCode || null);
+            setShareRoomId(data.payload.room.roomId || null);
+            setIsRoomMode(false);
+          }
+        }}
         onDeleteRoom={handleDeleteRoom}
         visible={isRoomMode && !currentRoomId}
       />
