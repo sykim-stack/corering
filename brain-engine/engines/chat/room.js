@@ -46,9 +46,19 @@ async function clearMessages(ctx) {
 }
 
 async function deleteRoom(ctx) {
-  const { roomId } = ctx.payload || {};
+  const { roomId, deviceId } = ctx.payload || {};
   const supabase = await getStorage();
   if (!supabase) return { ...ctx, _error: 'DB connection failed' };
+
+  // 방장(owner_device_id)만 삭제 가능하도록 검증
+  const { data: existing, error: fetchError } = await supabase
+    .from('chat_rooms').select('owner_device_id').eq('id', roomId).maybeSingle();
+  if (fetchError) return { ...ctx, _error: fetchError.message };
+  if (!existing) return { ...ctx, _error: 'Room not found: ' + roomId };
+  if (!deviceId || existing.owner_device_id !== deviceId) {
+    return { ...ctx, _error: 'FORBIDDEN: 방장만 삭제할 수 있습니다.' };
+  }
+
   const { error } = await supabase.from('chat_rooms').delete().eq('id', roomId);
   if (error) return { ...ctx, _error: error.message };
   return { ...ctx, deleted: true };

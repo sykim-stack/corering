@@ -63,20 +63,23 @@ export async function DELETE(
 ) {
   const traceId = crypto.randomUUID();
   const { roomId } = await params;
+  const deviceId = request.headers.get('x-device-id') || '';   // ① 헤더에서 deviceId 추출
 
   try {
     const { ChatRoomEngine } = await import('@/brain-engine/engines/chat/room.js');
     const result: any = await ChatRoomEngine({
       type:    'DELETE_ROOM',
-      payload: { roomId },
+      payload: { roomId, deviceId },   // ② payload에 deviceId 포함
       traceId,
       _error:  null,
     });
 
     if (result._error) {
+      // ③ FORBIDDEN이면 403, 아니면 500
+      const status = String(result._error).startsWith('FORBIDDEN') ? 403 : 500;
       return Response.json(
         { payload: null, _error: result._error, traceId },
-        { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
     }
 

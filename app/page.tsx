@@ -455,6 +455,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
   const handleDeleteRoom = useCallback(async (roomId: string) => {
     const res = await fetch(`/api/chat/rooms/${roomId}`, {
       method: 'DELETE',
+      headers: { 'x-device-id': deviceId },
     }).catch(() => null);
     const data = res ? await res.json().catch(() => null) : null;
     if (data?.payload?.deleted) {
@@ -464,6 +465,8 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
         return updated;
       });
       loadRooms();
+    } else if (String(data?._error || '').startsWith('FORBIDDEN')) {
+      alert('방장만 삭제할 수 있어요.');
     }
   }, [loadRooms]);
 
