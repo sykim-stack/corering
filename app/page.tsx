@@ -575,7 +575,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
           const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json; charset=utf-8' },
-            body: JSON.stringify({ action: 'create', title, isPublic }),
+            body: JSON.stringify({ action: 'create', title, isPublic, createdBy: deviceId }),
           }).catch(() => null);
           const data = res ? await res.json().catch(() => null) : null;
           if (data?.payload?.room) {
