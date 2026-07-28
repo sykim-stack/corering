@@ -8,6 +8,7 @@ interface Room {
   inviteCode?: string;
   messageCount?: number;
   isPublic?: boolean;
+  ownerDeviceId?: string; 
 }
 
 interface RoomListProps {
@@ -18,10 +19,10 @@ interface RoomListProps {
   onJoinByCode: (inviteCode: string) => void;
   onDeleteRoom: (roomId: string) => void;
   visible: boolean;
+  deviceId?: string;
 }
 
-export default function RoomList({ rooms, myRooms = [], onSelectRoom, onCreateRoom, onJoinByCode, onDeleteRoom, visible }: RoomListProps) {
-  const [code, setCode] = useState('');
+export default function RoomList({ rooms, myRooms = [], onSelectRoom, onCreateRoom, onJoinByCode, onDeleteRoom, visible, deviceId }: RoomListProps) {
   const [codeError, setCodeError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -87,12 +88,14 @@ export default function RoomList({ rooms, myRooms = [], onSelectRoom, onCreateRo
                     </div>
                   )}
                 </div>
-                <button
-                  className={styles.deleteBtn}
-                  onClick={(e) => { e.stopPropagation(); onDeleteRoom(room.roomId); }}
-                >
-                  삭제
-                </button>
+                {room.ownerDeviceId === deviceId && (
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={(e) => { e.stopPropagation(); onDeleteRoom(room.roomId); }}
+                  >
+                    삭제
+                  </button>
+                )}
               </div>
             ))}
           </>

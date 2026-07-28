@@ -15,7 +15,7 @@ async function createRoom(ctx) {
   if (!supabase) return { ...ctx, _error: 'DB connection failed' };
   const { data, error } = await supabase.from('chat_rooms').insert({ room_name: title, invite_code: generateInviteCode(), room_type: 'chat', created_by: null, owner_device_id: createdBy, is_permanent: false, is_public: isPublic, metadata: { tags, maxParticipants, createdBy, isPublic } }).select().single();
   if (error) return { ...ctx, _error: error.message };
-  return { ...ctx, room: { roomId: data.id, inviteCode: data.invite_code, title: data.room_name, status: 'active', createdBy, createdAt: data.created_at, updatedAt: data.created_at, messageCount: 0, participantCount: 1, maxParticipants, tags } };
+ return { ...ctx, room: { roomId: data.id, inviteCode: data.invite_code, title: data.room_name, status: 'active', createdBy, ownerDeviceId: data.owner_device_id, createdAt: data.created_at, updatedAt: data.created_at, messageCount: 0, participantCount: 1, maxParticipants, tags } };
 }
 
 async function getRoom(ctx) {
@@ -32,7 +32,7 @@ async function listRooms(ctx) {
   if (!supabase) return { ...ctx, _error: 'DB connection failed' };
   const { data, error } = await supabase.from('chat_rooms').select('*').eq('is_public', true).order('created_at', { ascending: false });
   if (error) return { ...ctx, _error: error.message };
-  return { ...ctx, rooms: (data || []).map(r => ({ roomId: r.id, inviteCode: r.invite_code, title: r.room_name, status: 'active', createdBy: r.metadata?.createdBy || 'anonymous', createdAt: r.created_at, updatedAt: r.created_at, messageCount: r.metadata?.messageCount || 0, participantCount: 0, maxParticipants: r.metadata?.maxParticipants || 100, tags: r.metadata?.tags || [] })) };
+  return { ...ctx, rooms: (data || []).map(r => ({ roomId: r.id, inviteCode: r.invite_code, title: r.room_name, status: 'active', createdBy: r.metadata?.createdBy || 'anonymous', ownerDeviceId: r.owner_device_id, createdAt: r.created_at, updatedAt: r.created_at, messageCount: r.metadata?.messageCount || 0, participantCount: 0, maxParticipants: r.metadata?.maxParticipants || 100, tags: r.metadata?.tags || [] })) };
 }
 
 async function clearMessages(ctx) {
