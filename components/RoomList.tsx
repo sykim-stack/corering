@@ -23,6 +23,7 @@ interface RoomListProps {
 }
 
 export default function RoomList({ rooms, myRooms = [], onSelectRoom, onCreateRoom, onJoinByCode, onDeleteRoom, visible, deviceId }: RoomListProps) {
+  const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
