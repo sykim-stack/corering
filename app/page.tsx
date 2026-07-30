@@ -65,15 +65,25 @@ const subscribePush = async (deviceId: string) => {
 };
 
 // ── device_id ────────────────────────────────────────────────────────
-const getDeviceId = () => {
-  if (typeof window === 'undefined') return 'anonymous';
-  let id = localStorage.getItem('deviceId');
-  if (!id) {
-    id = `device_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    localStorage.setItem('deviceId', id);
+// CoreNull 패턴 준수: localStorage 접근은 useEffect 안에서만 수행 (SSR 하이드레이션 불일치 방지)
+// 기존 키('deviceId')에 값이 있으면 신규 키('corering_device_id')로 마이그레이션하여 유지
+const DEVICE_ID_KEY = 'corering_device_id';
+const LEGACY_DEVICE_ID_KEY = 'deviceId';
+
+function readOrCreateDeviceId(): string {
+  const existing = localStorage.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+
+  const legacy = localStorage.getItem(LEGACY_DEVICE_ID_KEY);
+  if (legacy) {
+    localStorage.setItem(DEVICE_ID_KEY, legacy);
+    return legacy;
   }
-  return id;
-};
+
+  const fresh = crypto.randomUUID();
+  localStorage.setItem(DEVICE_ID_KEY, fresh);
+  return fresh;
+}
 
 // ── 오늘의 단어 ──────────────────────────────────────────────────────
 const fetchDailyWord = async (): Promise<DailyWord & { _error?: string }> => {
@@ -113,7 +123,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
   const [selectedMessage,setSelectedMessage]= useState<Message | null>(null);
   const [selectedWord,   setSelectedWord]   = useState<any>(null);
   const [isLoading,      setIsLoading]      = useState(false);
-  const [deviceId]                          = useState(getDeviceId);
+  const [deviceId, setDeviceId]              = useState('');
   const chatRef                             = useRef<HTMLDivElement>(null);
   const [firstLanguage,  setFirstLanguage]  = useState<string | null>(null);
   const [dailyWord,      setDailyWord]      = useState<DailyWord>({
@@ -174,6 +184,11 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
     if (isNearBottom) el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  // ── device_id 확정 (useEffect 안에서만 localStorage 접근, SSR 안전) ─
+  useEffect(() => {
+    setDeviceId(readOrCreateDeviceId());
+  }, []);
 
   // ── 마운트 시 번역기 기록 복원 (localStorage) ─────────────────────
   // useState 초기값에서 읽으면 SSR hydration 불일치 에러 발생
