@@ -4,12 +4,14 @@
 //
 // 실행: node scripts/promote-language-knowledge.js
 //
+// v1.2 변경사항:
+//   - source_expression 품질 수정: rows[0] 문장 전체(최대 200자) -> 여러 후보 중
+//     가장 짧은 예시(최대 40자)로 교체. dialect_north 등에서 문장 전체가
+//     들어가던 문제 해결.
+//   - consistency 임계값은 건드리지 않음 (다음 재진단: tb_trans_logs 1500~2000건 시점)
+//
 // v1.1 변경사항 (진단 결과 반영):
 //   - 글로벌 단일 임계값 폐기 -> 타입별 임계값으로 전환
-//   - emotion_pattern: intent_conf가 중립 메시지에서 원래 낮게 나오는 특성 반영
-//   - dialect_pattern: consistency 정의(전체 중 비율)가 구조적으로 낮을 수밖에 없어 완화
-//   - translation_pattern: 저품질 번역은 소수여야 정상이므로 consistency 기준 대폭 완화
-//   - cultural_pattern: 데이터 부족 확인됨 -> 기존 엄격 기준 유지 (의도적 보류)
 //
 // 원칙:
 //   - tb_trans_logs는 절대 수정하지 않음 (Archive 보호)
@@ -20,7 +22,6 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
-// ── 타입별 승격 임계값 (2026-08 진단 데이터 기반, 튜닝 대상) ─────────
 const THRESHOLDS_BY_TYPE = {
   emotion_pattern:      { minFrequency: 10, minConfidence: 0.4, minConsistency: 0.6 },
   dialect_pattern:       { minFrequency: 5,  minConfidence: 0.9, minConsistency: 0.2 },
@@ -30,7 +31,6 @@ const THRESHOLDS_BY_TYPE = {
 
 const INTENT_CONF_MAP = { high: 1.0, medium: 0.7, inferred: 0.4 };
 
-// ── .env.local 로더 ──────────────────────────────────────────────
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), '.env.local');
   if (!fs.existsSync(envPath)) return;
@@ -84,6 +84,17 @@ function round3(n) {
   return Math.round(n * 1000) / 1000;
 }
 
+// ── v1.2: 짧은 대표 예시 추출 (문장 전체 대신 가장 짧은 표현 선택) ─────
+function shortestExample(rows, maxLen = 40) {
+  const texts = rows
+    .map((r) => r.source_text?.trim())
+    .filter((t) => t && t.length > 0)
+    .sort((a, b) => a.length - b.length);
+  if (!texts.length) return null;
+  const shortest = texts[0];
+  return shortest.length > maxLen ? shortest.slice(0, maxLen) + '…' : shortest;
+}
+
 // ── [1] emotion_pattern ──────────────────────────────────────────
 function buildEmotionPatterns(logs) {
   const withIntentEmotion = logs.filter((l) => l.intent && l.emotion);
@@ -102,7 +113,7 @@ function buildEmotionPatterns(logs) {
     results.push({
       knowledge_type: 'emotion_pattern',
       pattern_key: (intent + '_' + emotion).toLowerCase(),
-      source_expression: rows[0]?.source_text?.slice(0, 200) || null,
+      source_expression: shortestExample(rows),
       description: '의도 \'' + intent + '\' 표현은 감정 \'' + emotion + '\'과 함께 나타나는 경향이 있습니다 ' +
         '(해당 의도 표현 중 ' + Math.round(consistency * 100) + '% 비율, 표본 ' + rows.length + '건).',
       emotion,
@@ -131,7 +142,7 @@ function buildTranslationPatterns(logs) {
     results.push({
       knowledge_type: 'translation_pattern',
       pattern_key: (direction + '_low_meaning').toLowerCase(),
-      source_expression: lowRows[0]?.source_text?.slice(0, 200) || null,
+      source_expression: shortestExample(lowRows),
       description: direction + ' 방향 번역에서 의미 전달률이 낮은(0.6 미만) 표현이 ' +
         '전체의 ' + Math.round(consistency * 100) + '% 비율로 반복됩니다 (표본 ' + lowRows.length + '건). ' +
         '직역 위험 - 문화적 맥락 보완 필요.',
@@ -156,7 +167,7 @@ function buildTranslationPatterns(logs) {
     results.push({
       knowledge_type: 'translation_pattern',
       pattern_key: ('exact_' + text).slice(0, 120),
-      source_expression: rows[0].source_text?.slice(0, 200) || null,
+      source_expression: shortestExample(rows),
       description: '"' + text.slice(0, 50) + '" 표현이 ' + rows.length + '회 반복되며 ' +
         '평균 의미 전달률이 ' + avgScore.toFixed(2) + '로 낮습니다. 직역 위험 표현.',
       emotion: null,
@@ -189,7 +200,7 @@ function buildDialectPatterns(logs) {
     results.push({
       knowledge_type: 'dialect_pattern',
       pattern_key: 'dialect_' + dialect,
-      source_expression: rows[0]?.source_text?.slice(0, 200) || null,
+      source_expression: shortestExample(rows),
       description: '방언 \'' + dialect + '\'로 감지된 표현이 전체 방언 감지 결과 중 ' +
         Math.round(consistency * 100) + '%를 차지하며, is_southern 플래그와의 ' +
         '일치율은 ' + Math.round(confidence * 100) + '%입니다 (표본 ' + rows.length + '건).',
@@ -222,7 +233,7 @@ function buildCulturalPatterns(logs) {
     results.push({
       knowledge_type: 'cultural_pattern',
       pattern_key: ('cultural_' + direction).toLowerCase(),
-      source_expression: culturalRows[0]?.source_text?.slice(0, 200) || null,
+      source_expression: shortestExample(culturalRows),
       description: direction + ' 방향 번역 중 ' + Math.round(consistency * 100) + '%가 ' +
         '문화적 맥락 조정을 필요로 했습니다 (표본 ' + culturalRows.length + '/' + rows.length + '건).',
       emotion: null,
@@ -236,7 +247,6 @@ function buildCulturalPatterns(logs) {
   return results;
 }
 
-// ── 타입별 임계값 필터 ─────────────────────────────────────────────
 function passesThreshold(candidate) {
   const t = THRESHOLDS_BY_TYPE[candidate.knowledge_type];
   if (!t) return false;
@@ -247,7 +257,6 @@ function passesThreshold(candidate) {
   );
 }
 
-// ── 승격 실행 ────────────────────────────────────────────────────
 async function promote(supabase, candidates) {
   if (!candidates.length) {
     console.log('  (임계값을 만족하는 후보 없음)');
@@ -295,9 +304,8 @@ async function promote(supabase, candidates) {
   return { inserted, updated, skipped };
 }
 
-// ── 메인 ─────────────────────────────────────────────────────────
 async function main() {
-  console.log('Language Knowledge Pipeline - Phase 1 배치 시작 (v1.1 타입별 임계값)\n');
+  console.log('Language Knowledge Pipeline - Phase 1 배치 시작 (v1.2 source_expression 수정)\n');
   for (const [type, t] of Object.entries(THRESHOLDS_BY_TYPE)) {
     console.log('  ' + type + ': freq>=' + t.minFrequency + ', conf>=' + t.minConfidence + ', consist>=' + t.minConsistency);
   }
