@@ -1,4 +1,4 @@
-// brain-engine/engines/emotion/analyze.js
+﻿// brain-engine/engines/emotion/analyze.js
 // -----------------------------------------------------------------
 // 감정/위험/의미/의도/문화 분석 -- Gemini 기반으로 진화
 // (ctx) => ctx 형태 준수, throw 금지 (구조는 유지, 의미만 진화)
@@ -43,6 +43,8 @@ function keywordFallback(text) {
     meaningScore: null,
     culturalNote: null,
     isCulturalAdjusted: false,
+    contextType: null,
+    keywords: [],
   };
 }
 
@@ -70,12 +72,18 @@ function buildPrompt(text, translatedText, sourceLang) {
   "intent": <"NEUTRAL"|"COMPLAINT"|"THREAT"|"AFFECTION"|"REQUEST" 중 하나>,
   "intent_confidence": <"high"|"medium"|"inferred">,
   "is_cultural": <문화적 오해 가능성이 있으면 true, 없으면 false>,
-  "cultural_note": <문화 맥락 설명 한 문장, 없으면 null>
+  "cultural_note": <문화 맥락 설명 한 문장, 없으면 null>,
+  "context_type": <"greeting"|"question"|"emotion"|"request"|"gratitude"|"complaint"|"neutral" 중 하나>,
+  "keywords": [
+    <문장에서 의미 있는 핵심 단어 최대 3개. 각 항목은 {"ko": "...", "vi": "..."} 형태.
+     인사/추임새/단순 대답("응","네","ㅋㅋ","ok" 등)만 있는 문장이면 빈 배열 []>
+  ]
 }
 
 판단 기준:
 - meaning_reason: 번역 시 뉘앙스/감정/맥락이 손실된 구체적 이유 (예: "남부 방언 특성상 동일한 한국어 표현이 없습니다")
-- risk_reason: 갈등 유발 가능한 구체적 요소 (예: ["명령형 표현", "감정 강도 높음"])`;
+- risk_reason: 갈등 유발 가능한 구체적 요소 (예: ["명령형 표현", "감정 강도 높음"])
+- keywords: 학습 가치가 있는 단어만 (인사말/추임새/감탄사는 제외), 원문과 번역문 양쪽의 실제 표기 그대로`;
 }
 
 async function callGemini(prompt, apiKey) {
@@ -155,6 +163,8 @@ export async function analyze(ctx) {
           : null,
       culturalNote: gemini.is_cultural ? (gemini.cultural_note || null) : null,
       isCulturalAdjusted: !!gemini.is_cultural,
+      contextType: gemini.context_type || null,
+      keywords: Array.isArray(gemini.keywords) ? gemini.keywords : [],
     };
 
     return mergePayload(ctx, result);
@@ -181,6 +191,8 @@ function mergePayload(ctx, result) {
       riskReason: result.riskReason ?? null,
       culturalNote: result.culturalNote,
       isCulturalAdjusted: result.isCulturalAdjusted,
+      contextType: result.contextType ?? null,
+      keywords: result.keywords ?? [],
     },
   };
 }

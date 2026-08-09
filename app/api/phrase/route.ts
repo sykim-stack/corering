@@ -1,7 +1,7 @@
 ﻿import { createClient } from '@supabase/supabase-js';
-import { CoreNullLayer } from '@/brain-engine/layers/CoreNullLayer.js';
+import { RingLexiconLayer } from '@/brain-engine/layers/RingLexiconLayer.js';
 
-const layer = new CoreNullLayer();
+const layer = new RingLexiconLayer();
 
 function normalizeAction(action: string): string {
   if (action === 'get-word-data') return 'getWordData';

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   const traceId = crypto.randomUUID();
@@ -91,12 +91,32 @@ export async function POST(request: NextRequest) {
               const ap = analysisCtx.payload;
               console.log(`[chat/send] 분석 완료 traceId=${traceId} emotion=${ap?.emotion} risk=${ap?.riskScore}`);
 
+              // ── Language Knowledge: 어휘/구문 자동 추출 저장 (새 AI 호출 없음) ──
+              try {
+                const { saveVocabulary, savePhrase } = await import('@/brain-engine/connectors/storage.js');
+                await saveVocabulary({ payload: { keywords: ap?.keywords, sourceLang, source: 'chat' } });
+                if (ap?.contextType || translated) {
+                  await savePhrase({
+                    payload: {
+                      text: original,
+                      translatedText: translated,
+                      sourceLang,
+                      contextType: ap?.contextType,
+                      source: 'chat',
+                      logId: translationMeta.tbTransLogId,
+                    },
+                  });
+                }
+              } catch (e: any) {
+                console.warn('[chat/send] Language Knowledge 저장 실패 (무시):', e.message);
+              }
+
               // tb_trans_logs에 저장 (getWordData에서 분석값 읽어오기 위해)
               const { getStorage } = await import('@/brain-engine/connectors/storage.js');
               const db = await getStorage();
               if (db) {
-                const sourceLang = ctx.payload?.sourceLang || null;
-                const direction = sourceLang === 'ko' ? 'KO_VI' : 'VI_KO';
+                const sourceLangForLog = ctx.payload?.sourceLang || null;
+                const direction = sourceLangForLog === 'ko' ? 'KO_VI' : 'VI_KO';
                 const updatePayload = {
                   emotion:          ap?.emotion || 'neutral',
                   emotion_score:    ap?.emotionScore ?? 0.5,

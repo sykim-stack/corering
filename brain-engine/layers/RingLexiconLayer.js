@@ -1,10 +1,14 @@
-// brain-engine/layers/CoreNullLayer.js
+﻿// brain-engine/layers/RingLexiconLayer.js
 // DB 스키마: id, standard_word, southern_word, hue_word, mekong_word, meaning_ko, meaning_en,
 // part_of_speech, category_main, category_sub, pronunciation_diff, conversion_rule,
 // frequency, formality_level, generation, region, example_northern, example_southern,
 // notes, created_at, entry_type, dialect, status, source, emotion_score, conflict_weight
+//
+// tp_lexicon: 채팅에서 자동 추출된 어휘 (Language Knowledge Phase 1.5)
+//   - tp_translations(정성 사전)에 없을 때 보완 조회용
+//   - translation_group_id로 언어쌍이 묶여 있음
 
-export class CoreNullLayer {
+export class RingLexiconLayer {
   async handle(ctx) {
     const action = ctx.payload?.action || ctx.action;
     switch (action) {
@@ -21,6 +25,44 @@ export class CoreNullLayer {
       default:
         return { ...ctx, _error: { code: 'UNKNOWN_ACTION', message: `Unknown action: ${action}` } };
     }
+  }
+
+  // ── tp_lexicon 보완 조회 (tp_translations에 없을 때만 호출됨) ──────
+  async lookupLexicon(ctx, word, isKorean) {
+    const searchLang = isKorean ? 'ko' : 'vi';
+    const normalized = word.trim().toLowerCase();
+
+    const { data: entry, error } = await ctx.supabase
+      .from('tp_lexicon')
+      .select('id, translation_group_id, language, lemma, frequency, status')
+      .eq('language', searchLang)
+      .eq('normalized_lemma', normalized)
+      .neq('status', 'deprecated')
+      .order('frequency', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !entry) return null;
+
+    // 같은 translation_group_id를 가진 다른 언어 행 = 번역 짝
+    const { data: pairs } = await ctx.supabase
+      .from('tp_lexicon')
+      .select('language, lemma')
+      .eq('translation_group_id', entry.translation_group_id)
+      .neq('language', searchLang);
+
+    const translations = {};
+    for (const p of pairs || []) {
+      translations[p.language] = p.lemma;
+    }
+
+    return {
+      matchedWord: entry.lemma,
+      language: entry.language,
+      translations,
+      frequency: entry.frequency,
+      status: entry.status,
+    };
   }
 
   async getWordData(ctx) {
@@ -73,10 +115,15 @@ export class CoreNullLayer {
       }
     }
 
+    // ── tp_translations(정성 사전)에 없으면 tp_lexicon(자동 추출)으로 보완 ──
+    let lexiconMatch = null;
+    if (!data && !isSentence) {
+      lexiconMatch = await this.lookupLexicon(ctx, word, isKorean);
+    }
+
     // tb_trans_logs에서 분석값 조회 (단어 & 문장 모두)
     let analysisData = null;
     try {
-      // 공백 있는 문장은 .or() 파싱 에러가 나므로 개별 조회
       const logQuery = ctx.supabase
         .from('tb_trans_logs')
         .select('emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason')
@@ -85,7 +132,6 @@ export class CoreNullLayer {
 
       let logResult;
       if (isSentence) {
-        // 문장: source_text 또는 standard_vi로 각각 조회
         const r1 = await ctx.supabase.from('tb_trans_logs')
           .select('emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason')
           .eq('source_text', word)
@@ -105,11 +151,11 @@ export class CoreNullLayer {
       }
 
       analysisData = logResult?.data?.[0] ?? null;
-      console.log(`[getWordData] word="${word}" isSentence=${isSentence} riskScore=${analysisData?.risk_score} emotion=${analysisData?.emotion}`);
+      console.log(`[getWordData] word="${word}" isSentence=${isSentence} riskScore=${analysisData?.risk_score} emotion=${analysisData?.emotion} lexiconMatch=${!!lexiconMatch}`);
     } catch (e) { /* 분석값 없어도 카드는 표시 */ }
 
-    // 사전에도 없고 분석값도 없으면 NOT_FOUND
-    if (!data && !analysisData) {
+    // 사전에도 없고, 자동추출 데이터도 없고, 분석값도 없으면 NOT_FOUND
+    if (!data && !lexiconMatch && !analysisData) {
       return { ...ctx, _error: { code: 'NOT_FOUND', message: `Word "${word}" not found` } };
     }
 
@@ -117,13 +163,19 @@ export class CoreNullLayer {
       ? ((dialect === 'southern') ? data.example_southern : data.example_northern)
       : null;
 
+    // meaning: tp_translations 우선 → tp_lexicon 번역 짝 → null
+    let meaning = data?.meaning_ko || null;
+    if (!meaning && lexiconMatch) {
+      meaning = isKorean ? lexiconMatch.translations.vi : lexiconMatch.translations.ko;
+    }
+
     return { ...ctx, result: {
       word,
-      standard:        data?.standard_word || null,
+      standard:        data?.standard_word || lexiconMatch?.matchedWord || null,
       southern:        data?.southern_word || null,
       hue:             data?.hue_word || null,
       mekong:          data?.mekong_word || null,
-      meaning:         data?.meaning_ko || null,
+      meaning,
       examples:        example ? [example] : [],
       culturalNote:    data?.notes || null,
       riskScore:       analysisData?.risk_score ?? data?.conflict_weight ?? 0,
@@ -135,6 +187,7 @@ export class CoreNullLayer {
       intent:          analysisData?.intent || null,
       detectedDialect: analysisData?.detected_dialect || 'unknown',
       partOfSpeech:    data?.part_of_speech || null,
+      source:          data ? 'curated' : (lexiconMatch ? 'auto_extracted' : 'analysis_only'),
     }};
   }
 
@@ -270,4 +323,4 @@ export class CoreNullLayer {
   }
 }
 
-export default CoreNullLayer;
+export default RingLexiconLayer;

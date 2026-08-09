@@ -1,5 +1,4 @@
-﻿// app/api/brainpool/route.ts
-import type { NextRequest } from 'next/server';
+﻿import type { NextRequest } from 'next/server';
 import { route } from '@/brain-engine/hajun/router.js';
 import { createCtx } from '@/brain-engine/contracts/ctx.js';
 
@@ -145,6 +144,26 @@ export async function POST(request: NextRequest) {
           `emotion=${ap?.emotion} risk=${ap?.riskScore}`,
           `dialect=${ap?.detectedDialect} logId=${logId}`
         );
+
+        // ── Language Knowledge: 어휘/구문 자동 추출 저장 (새 AI 호출 없음) ──
+        try {
+          const { saveVocabulary, savePhrase } = await import('@/brain-engine/connectors/storage.js');
+          await saveVocabulary({ payload: { keywords: ap?.keywords, sourceLang, source: 'translator' } });
+          if (ap?.contextType || p.translatedText) {
+            await savePhrase({
+              payload: {
+                text: p.text,
+                translatedText: p.translatedText || p.text,
+                sourceLang,
+                contextType: ap?.contextType,
+                source: 'translator',
+                logId,
+              },
+            });
+          }
+        } catch (e: any) {
+          console.warn('[brainpool] Language Knowledge 저장 실패 (무시):', e.message);
+        }
 
         // tb_trans_logs에 분석 결과 UPDATE
         if (logId) {
