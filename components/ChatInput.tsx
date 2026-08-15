@@ -9,6 +9,8 @@ interface ChatInputProps {
   onVoiceSend?: (audioUrl: string) => void;
 }
 
+const SILENCE_TIMEOUT_MS = 2000;
+
 export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -16,10 +18,10 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef<string>('');
-  // iOS Safari에서 pointer/touch 이벤트가 동시에 발화하는 경우가 있어
-  // start/stop이 각각 정확히 1회만 실행되도록 막는 가드.
-  // useState(isRecording)은 비동기라 연속 이벤트 사이에 최신값이 아닐 수 있으므로
-  // 즉시 읽고 쓸 수 있는 ref로 별도 관리한다.
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // press-and-hold → tap-to-toggle 전환에 따른 가드.
+  // 탭이 아주 짧은 간격으로 두 번 들어오는 것(더블탭 등)을 대비해
+  // start/stop이 각각 정확히 1회만 실행되도록 막는다.
   const recordingGuardRef = useRef(false);
 
   const handleSend = () => {
@@ -46,8 +48,22 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
     }
   };
 
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  };
+
+  // 마지막 onresult로부터 SILENCE_TIMEOUT_MS 동안 새 결과가 없으면 자동 종료
+  const resetSilenceTimer = () => {
+    clearSilenceTimer();
+    silenceTimerRef.current = setTimeout(() => {
+      stopRecording();
+    }, SILENCE_TIMEOUT_MS);
+  };
+
   const startRecording = async () => {
-    // 가드: 이미 녹음 중이면 (pointerdown + touchstart 등 중복 발화) 무시
     if (recordingGuardRef.current) return;
     recordingGuardRef.current = true;
 
@@ -69,17 +85,22 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
           if (e.results[i].isFinal) final += e.results[i][0].transcript;
         }
         if (final) transcriptRef.current = final;
+        // 말이 계속 들어오는 동안은 무음 타이머를 계속 뒤로 미룸
+        resetSilenceTimer();
       };
       rec.onerror = (e: any) => {
         console.warn('[STT] 오류:', e.error);
-        // 인식 자체가 실패로 끝난 경우 가드/상태를 반드시 풀어준다
-        // (iOS에서 stop 이벤트가 씹혀 recording 상태가 영구히 멈추는 것 방지)
+        // iOS 등에서 stop 이벤트 없이 인식이 끊기는 경우
+        // 가드/상태가 영구히 "녹음 중"으로 남지 않도록 강제 해제
+        clearSilenceTimer();
         recordingGuardRef.current = false;
         setIsRecording(false);
       };
       rec.start();
       recognitionRef.current = rec;
       setIsRecording(true);
+      // 녹음 시작 직후에도 무음 타이머를 걸어둠 (탭만 하고 아예 말을 안 하는 경우 대비)
+      resetSilenceTimer();
     } catch (e) {
       console.warn('음성 인식 실패:', e);
       recordingGuardRef.current = false;
@@ -87,10 +108,10 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
   };
 
   const stopRecording = () => {
-    // 가드: 이미 정지됐거나 애초에 시작되지 않았으면 중복 실행 방지
     if (!recordingGuardRef.current) return;
     recordingGuardRef.current = false;
 
+    clearSilenceTimer();
     setIsRecording(false);
     try { recognitionRef.current?.stop(); } catch (e) {}
     setTimeout(() => {
@@ -99,6 +120,15 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
         transcriptRef.current = '';
       }
     }, 500);
+  };
+
+  // tap-to-toggle: 녹음 중이 아니면 시작, 녹음 중이면 종료
+  const handleMicTap = () => {
+    if (recordingGuardRef.current) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   return (
@@ -113,18 +143,12 @@ export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
         rows={1}
       />
       <button
-        onPointerDown={startRecording}
-        onPointerUp={stopRecording}
-        onPointerLeave={stopRecording}
-        onPointerCancel={stopRecording}
-        onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); startRecording(); }}
-        onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); stopRecording(); }}
-        onTouchCancel={(e) => { e.preventDefault(); e.stopPropagation(); stopRecording(); }}
-        onContextMenu={(e) => e.preventDefault()}
+        onClick={handleMicTap}
         className={`${styles.voiceBtn} ${isRecording ? styles.recording : ''}`}
         type="button"
+        aria-label={isRecording ? '녹음 종료' : '음성 입력 시작'}
       >
-        {isRecording ? '🔴' : '🎤'}
+        {isRecording ? '🔴' : '🎙️'}
       </button>
       <button
         onClick={handleSend}
