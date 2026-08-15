@@ -9,7 +9,7 @@ interface ChatInputProps {
   onVoiceSend?: (audioUrl: string) => void;
 }
 
-const SILENCE_TIMEOUT_MS = 2000;
+const SILENCE_TIMEOUT_MS = 5000;
 
 export default function ChatInput({ onSend, onTypingChange }: ChatInputProps) {
   const [text, setText] = useState('');
