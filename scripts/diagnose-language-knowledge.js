@@ -4,10 +4,23 @@
 // frequency/confidence/consistency 값을 표로 출력한다.
 //
 // 실행: node scripts/diagnose-language-knowledge.js
+//
+// v1.1 변경사항:
+//   - promote-language-knowledge.js v1.3와 동일한 문제 발견: Supabase/PostgREST
+//     서버측 기본 응답 상한(db-max-rows, 기본 1000건)이 .limit(5000) 요청과
+//     무관하게 응답을 1000건으로 잘라내고 있었음. (tb_trans_logs가 2000건을
+//     넘은 상태에서도 진단 결과가 항상 "1000건" 기준으로만 나오던 원인)
+//   - fetchAllLogs()에서 .range()로 1000건씩 나눠 조회 -> 전체 데이터 확보.
 
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+
+// PostgREST 서버측 기본 상한(대부분 1000)과 무관하게 전체를 끌어오기 위한
+// 클라이언트 페이지 크기. 서버 상한보다 작거나 같게 잡아야 안전하다.
+const PAGE_SIZE = 1000;
+// 무한 루프 방지용 안전장치 (100 * 1000 = 최대 10만건까지 커버)
+const MAX_PAGES = 100;
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), '.env.local');
@@ -39,6 +52,41 @@ function getSupabase() {
     process.exit(1);
   }
   return createClient(url, key);
+}
+
+// ── v1.1: db-max-rows(기본 1000) 우회용 페이지네이션 조회 ─────────────
+async function fetchAllLogs(supabase) {
+  const selectCols =
+    'source_text, standard_vi, direction, emotion, emotion_score, intent, ' +
+    'intent_conf, meaning_score, detected_dialect, is_southern, ' +
+    'is_cultural_adjusted, created_at';
+
+  let all = [];
+  let page = 0;
+
+  while (page < MAX_PAGES) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('tb_trans_logs')
+      .select(selectCols)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('조회 실패 (page ' + page + '):', error.message);
+      process.exit(1);
+    }
+
+    all = all.concat(data);
+    console.log('  페이지 ' + page + ': ' + data.length + '건 수신 (누적 ' + all.length + '건)');
+
+    if (data.length < PAGE_SIZE) break;
+    page++;
+  }
+
+  return all;
 }
 
 function groupBy(arr, keyFn) {
@@ -158,18 +206,10 @@ async function main() {
   console.log('진단 모드 - 승격 없이 후보 값만 출력\n');
   const supabase = getSupabase();
 
-  const { data: logs, error } = await supabase
-    .from('tb_trans_logs')
-    .select('source_text, standard_vi, direction, emotion, emotion_score, intent, intent_conf, meaning_score, detected_dialect, is_southern, is_cultural_adjusted, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5000);
+  console.log('tb_trans_logs 조회 중 (페이지당 ' + PAGE_SIZE + '건씩)...');
+  const logs = await fetchAllLogs(supabase);
 
-  if (error) {
-    console.error('조회 실패:', error.message);
-    process.exit(1);
-  }
-
-  console.log('분석 대상: ' + logs.length + '건\n');
+  console.log('\n분석 대상: ' + logs.length + '건\n');
 
   const all = [
     ...buildEmotionPatterns(logs),
