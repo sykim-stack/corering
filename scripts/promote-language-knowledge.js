@@ -4,6 +4,13 @@
 //
 // 실행: node scripts/promote-language-knowledge.js
 //
+// v1.4 변경사항:
+//   - promote()가 candidate 재계산 시 metadata를 통째로 덮어써서, 수동으로 심어둔
+//     큐레이션 태그(knowledge_class, review_trigger 등)가 다음 배치 실행마다
+//     조용히 사라지는 문제 확인.
+//   - PRESERVED_METADATA_KEYS에 정의된 키는 재계산되는 통계 metadata 위에
+//     보존되도록 병합 로직 추가. status=verified/deprecated 보호 로직은 무수정.
+//
 // v1.3 변경사항:
 //   - Supabase/PostgREST의 서버측 기본 응답 상한(db-max-rows, 기본 1000건)이
 //     .limit(5000) 요청과 무관하게 응답을 1000건으로 잘라내는 문제 확인.
@@ -355,7 +362,7 @@ async function promote(supabase, candidates) {
 }
 
 async function main() {
-  console.log('Language Knowledge Pipeline - Phase 1 배치 시작 (v1.3 페이지네이션 수정)\n');
+  console.log('Language Knowledge Pipeline - Phase 1 배치 시작 (v1.4 metadata 보존)\n');
   for (const [type, t] of Object.entries(THRESHOLDS_BY_TYPE)) {
     console.log('  ' + type + ': freq>=' + t.minFrequency + ', conf>=' + t.minConfidence + ', consist>=' + t.minConsistency);
   }

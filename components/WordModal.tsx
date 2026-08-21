@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import styles from './WordModal.module.css';
+import { speakIfVoiceAvailable } from '@/lib/tts';
 
 interface WordModalProps {
   data: {
@@ -49,6 +50,7 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [wordDetail, setWordDetail] = useState<any>(null);
+  const [ttsUnavailable, setTtsUnavailable] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -247,6 +249,11 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
           >🔊</button>
         </div>
         <p className={styles.subtitle}>단어 학습 카드</p>
+        {ttsUnavailable && (
+          <p className={styles.subtitle} style={{ color: 'var(--color-warn)', marginTop: '-8px' }}>
+            🔇 이 기기에 발음 음성팩이 없어요
+          </p>
+        )}
 
         <Section title="💡 뜻과 쓰임새">
           <Row label="뜻" value={meaning || '아직 데이터가 없습니다'} />
