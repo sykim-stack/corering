@@ -314,6 +314,9 @@ function passesThreshold(candidate) {
   );
 }
 
+// v1.4: 수동 큐레이션 태그는 재계산되는 통계 metadata 위에 보존
+const PRESERVED_METADATA_KEYS = ['knowledge_class', 'review_trigger'];
+
 async function promote(supabase, candidates) {
   if (!candidates.length) {
     console.log('  (임계값을 만족하는 후보 없음)');
@@ -322,7 +325,7 @@ async function promote(supabase, candidates) {
 
   const { data: existing, error: fetchErr } = await supabase
     .from('language_knowledge')
-    .select('knowledge_type, pattern_key, status')
+    .select('knowledge_type, pattern_key, status, metadata')
     .in('pattern_key', candidates.map((c) => c.pattern_key));
 
   if (fetchErr) {
@@ -331,21 +334,30 @@ async function promote(supabase, candidates) {
   }
 
   const existingMap = new Map(
-    (existing || []).map((e) => [e.knowledge_type + ':' + e.pattern_key, e.status])
+    (existing || []).map((e) => [e.knowledge_type + ':' + e.pattern_key, e])
   );
 
   let inserted = 0, updated = 0, skipped = 0;
 
   for (const c of candidates) {
     const key = c.knowledge_type + ':' + c.pattern_key;
-    const currentStatus = existingMap.get(key);
+    const existingRow = existingMap.get(key);
+    const currentStatus = existingRow?.status;
 
     if (currentStatus && currentStatus !== 'candidate') {
       skipped++;
       continue;
     }
 
-    const row = { ...c, source_core: 'CoreRing', status: 'candidate', updated_at: new Date().toISOString() };
+    // 수동 큐레이션 태그(knowledge_class, review_trigger)는 재계산 시에도 보존
+    const mergedMetadata = { ...(c.metadata || {}) };
+    if (existingRow?.metadata) {
+      for (const k of PRESERVED_METADATA_KEYS) {
+        if (existingRow.metadata[k] !== undefined) mergedMetadata[k] = existingRow.metadata[k];
+      }
+    }
+
+    const row = { ...c, metadata: mergedMetadata, source_core: 'CoreRing', status: 'candidate', updated_at: new Date().toISOString() };
     const { error } = await supabase
       .from('language_knowledge')
       .upsert(row, { onConflict: 'knowledge_type,pattern_key' });

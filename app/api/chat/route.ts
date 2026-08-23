@@ -153,6 +153,61 @@ export async function POST(request: NextRequest) {
                   }
                 }
               }
+
+              // ── repetition_count 계산 (CoreHub 합의 스키마) ──────
+              // intent 기준, 300초 윈도우, messages 테이블 한정.
+              // tb_trans_logs의 frequency/consistency(배치 집계)와는 별개 로직.
+              try {
+                if (db && ap?.intent) {
+                  const REPETITION_WINDOW_SEC = 300;
+                  const windowStart = new Date(Date.now() - REPETITION_WINDOW_SEC * 1000).toISOString();
+
+                  const { count, error: countError } = await db
+                    .from('messages')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('room_id', roomId)
+                    .eq('device_id', userId)
+                    .eq('meta->>intent', ap.intent)
+                    .gte('created_at', windowStart);
+
+                  if (countError) {
+                    console.warn('[chat/send] repetition_count 조회 실패:', countError.message);
+                  } else {
+                    // 방금 보낸 메시지 행을 room_id+device_id+content로 재특정
+                    const { data: targetRow, error: findError } = await db
+                      .from('messages')
+                      .select('id, meta')
+                      .eq('room_id', roomId)
+                      .eq('device_id', userId)
+                      .eq('content', original)
+                      .order('created_at', { ascending: false })
+                      .limit(1)
+                      .maybeSingle();
+
+                    if (!findError && targetRow?.id) {
+                      const repetitionCount = (count ?? 0) + 1; // 이번 메시지(자기 자신) 포함
+                      const mergedMeta = {
+                        ...(targetRow.meta || {}),
+                        intent: ap.intent,
+                        repetitionCount,
+                        repetitionWindowSec: REPETITION_WINDOW_SEC,
+                        repetitionBasis: 'intent',
+                      };
+                      const { error: updateError } = await db
+                        .from('messages')
+                        .update({ meta: mergedMeta })
+                        .eq('id', targetRow.id);
+                      if (updateError) {
+                        console.warn('[chat/send] repetition_count 저장 실패:', updateError.message);
+                      } else {
+                        console.log(`[chat/send] repetition_count=${repetitionCount} intent=${ap.intent} messageId=${targetRow.id}`);
+                      }
+                    }
+                  }
+                }
+              } catch (e: any) {
+                console.warn('[chat/send] repetition_count 계산 예외:', e.message);
+              }
             } catch (e: any) {
               console.warn('[chat/send] 백그라운드 분석 실패:', e.message);
             }
