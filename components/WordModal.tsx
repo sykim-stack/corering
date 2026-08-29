@@ -138,21 +138,22 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
 
   const handlePlayAudio = () => {
     if (audioUrl) {
-      const audio = new Audio(audioUrl);
+      // iOS 호환: new Audio() 직접 재생이 실패하는 경우가 있어 playsInline 적용
+      const audio = document.createElement('audio');
+      audio.src = audioUrl;
+      audio.controls = false;
+      (audio as any).playsInline = true;
+      document.body.appendChild(audio);
       audio.play().catch(() => { window.open(audioUrl, '_blank'); });
-    } else if (typeof window !== 'undefined' && window.speechSynthesis && meaning) {
-      const targetLang = sourceLang === 'ko' ? 'vi-VN' : 'ko-KR';
-      const voices = window.speechSynthesis.getVoices();
-      const hasVoice = voices.some(v => v.lang === targetLang || v.lang.startsWith(targetLang.split('-')[0]));
-      if (voices.length > 0 && !hasVoice) {
-        alert('이 기기에는 ' + (targetLang === 'vi-VN' ? '베트남어' : '한국어') + ' 음성이 설치되어 있지 않아요. 설정 > 손쉬운 사용 > 음성 콘텐츠에서 추가할 수 있어요.');
-        return;
-      }
-      const utterance = new SpeechSynthesisUtterance(meaning);
-      utterance.lang = targetLang;
-      utterance.rate = 0.9;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      audio.onended = () => document.body.removeChild(audio);
+      return;
+    }
+    if (!meaning) return;
+    const lang = sourceLang === 'ko' ? 'vi-VN' : 'ko-KR';
+    const played = speakNow(meaning, lang);
+    if (!played) {
+      setTtsUnavailable(true);
+      setTimeout(() => setTtsUnavailable(false), 2500);
     }
   };
 
@@ -333,16 +334,12 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
             </div>
           ) : (
             <button
-              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); startRecording(); }}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); stopRecording(); }}
-              onContextMenu={(e) => e.preventDefault()}
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
+              onClick={() => { if (isRecording) stopRecording(); else startRecording(); }}
               style={{ width: '100%', userSelect: 'none', WebkitUserSelect: 'none' }}
               disabled={isUploading}
               className={`${styles.saveBtn} ${isRecording ? styles.recordingBtn : ''}`}
             >
-              {isUploading ? '⏳ 저장 중...' : isRecording ? '🔴 녹음 중... (떼면 완료)' : '🎤 누르고 말하세요'}
+              {isUploading ? '⏳ 저장 중...' : isRecording ? '🔴 녹음 중... (다시 눌러 종료)' : '🎤 눌러서 녹음 시작'}
             </button>
           )}
         </Section>
