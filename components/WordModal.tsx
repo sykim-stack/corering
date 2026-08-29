@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import styles from './WordModal.module.css';
-import { speakIfVoiceAvailable } from '@/lib/tts';
+import { speakNow } from '@/lib/tts';
 
 interface WordModalProps {
   data: {

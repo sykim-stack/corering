@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import styles from './CorePhrase.module.css';
-import { speakIfVoiceAvailable } from '@/lib/tts';
+import { speakNow } from '@/lib/tts';
 
 interface VocabItem {
   id: string;
@@ -161,7 +161,7 @@ export default function CorePhrase({ userId }: CorePhraseProps) {
               <p className={styles.flipLabel}>베트남어</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <p className={styles.flipWord} style={{ margin: 0 }}>{currentCard?.word}</p>
-                <button onClick={(e) => { e.stopPropagation(); speakIfVoiceAvailable(currentCard?.word || '', 'vi-VN'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', flexShrink: 0 }}>🔊</button>
+                <button onClick={(e) => { e.stopPropagation(); speakNow(currentCard?.word || '', 'vi-VN'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', flexShrink: 0 }}>🔊</button>
               </div>
               <p className={styles.flipHint}>탭해서 한국어 확인</p>
 
@@ -253,7 +253,7 @@ export default function CorePhrase({ userId }: CorePhraseProps) {
                     <div className={styles.words}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span className={styles.word}>{item.word}</span>
-                        <button onClick={(e) => { e.stopPropagation(); speakIfVoiceAvailable(item.word, 'vi-VN'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', opacity: 0.7, flexShrink: 0 }}>🔊</button>
+                        <button onClick={(e) => { e.stopPropagation(); speakNow(item.word, 'vi-VN'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', opacity: 0.7, flexShrink: 0 }}>🔊</button>
                       </div>
                       {item.meaning_kr && <span className={styles.meaning}>{item.meaning_kr}</span>}
                       {item.memo && <span className={styles.memo}>✏️ {item.memo}</span>}
