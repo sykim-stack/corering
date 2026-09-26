@@ -43,6 +43,16 @@ const uploadVoice = async (blob: Blob, mimeType: string, userId: string) => {
   return json?.url || null;
 };
 
+const contextTypeLabel: Record<string, string> = {
+  greeting: '인사',
+  question: '질문',
+  emotion: '감정 표현',
+  request: '요청/부탁',
+  gratitude: '감사',
+  complaint: '불만/불평',
+  neutral: '일상',
+};
+
 export default function WordModal({ data, onClose, userId }: WordModalProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -122,6 +132,7 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
   const intent = detail?.intent || data.intent;
   const culturalNote = detail?.culturalNote || data.culturalNote;
   const sourceLang = data.sourceLang;
+  const phrase = detail?.phrase || null;
 
   const pronunciationTarget = sourceLang === 'ko'
     ? '🇻🇳 베트남어 발음을 알려주세요'
@@ -259,6 +270,16 @@ export default function WordModal({ data, onClose, userId }: WordModalProps) {
         <Section title="💡 뜻과 쓰임새">
           <Row label="뜻" value={meaning || '아직 데이터가 없습니다'} />
           {usage && <Row label="쓰임새" value={usage} />}
+          {/* tp_phrases: context_type / frequency (tb_trans_log_id 연결) */}
+          {phrase?.contextType && (
+            <Row
+              label="맥락"
+              value={
+                (contextTypeLabel[phrase.contextType] || phrase.contextType) +
+                (phrase.frequency > 1 ? ` · ${phrase.frequency}회` : '')
+              }
+            />
+          )}
           {/* meaning_score UI — Phase 1 */}
           {detail?.meaningScore != null && (
             <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-sub)' }}>
