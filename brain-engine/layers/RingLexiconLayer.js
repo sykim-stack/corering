@@ -1,4 +1,4 @@
-﻿// brain-engine/layers/RingLexiconLayer.js
+// brain-engine/layers/RingLexiconLayer.js
 // DB 스키마: id, standard_word, southern_word, hue_word, mekong_word, meaning_ko, meaning_en,
 // part_of_speech, category_main, category_sub, pronunciation_diff, conversion_rule,
 // frequency, formality_level, generation, region, example_northern, example_southern,
@@ -7,6 +7,10 @@
 // tp_lexicon: 채팅에서 자동 추출된 어휘 (Language Knowledge Phase 1.5)
 //   - tp_translations(정성 사전)에 없을 때 보완 조회용
 //   - translation_group_id로 언어쌍이 묶여 있음
+//
+// tp_phrases: 자동 추출 구문 (WordModal 문장 경험 소비)
+//   - 연결 키 = tb_trans_log_id (공식)
+//   - getWordData가 tb_trans_logs.id → tp_phrases 조회
 
 export class RingLexiconLayer {
   async handle(ctx) {
@@ -65,6 +69,24 @@ export class RingLexiconLayer {
     };
   }
 
+  // ── tp_phrases 조회 (tb_trans_log_id 공식 키) ─────────────────────
+  async lookupPhraseByLogId(ctx, logId) {
+    if (!logId) return null;
+    try {
+      const { data, error } = await ctx.supabase
+        .from('tp_phrases')
+        .select('id, context_type, frequency, source_text, target_text, source_language, target_language, source')
+        .eq('tb_trans_log_id', logId)
+        .order('frequency', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async getWordData(ctx) {
     const { word, dialect = 'standard' } = ctx.payload;
     if (!word) return { ...ctx, _error: { code: 'MISSING_WORD', message: 'word is required' } };
@@ -74,6 +96,10 @@ export class RingLexiconLayer {
       'example_northern, example_southern, notes, part_of_speech, ' +
       'pronunciation_diff, conversion_rule, frequency, formality_level, ' +
       'emotion_score, conflict_weight';
+
+    // 분석값 + log id (tp_phrases 연결용)
+    const LOG_SELECT =
+      'id, emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason';
 
     const isKorean = /[가-힣]/.test(word);
     const isSentence = word.includes(' ') || word.length > 15;
@@ -121,26 +147,27 @@ export class RingLexiconLayer {
       lexiconMatch = await this.lookupLexicon(ctx, word, isKorean);
     }
 
-    // tb_trans_logs에서 분석값 조회 (단어 & 문장 모두)
+    // tb_trans_logs에서 분석값 + id 조회 (단어 & 문장 모두)
     let analysisData = null;
+    let transLogId = null;
     try {
       const logQuery = ctx.supabase
         .from('tb_trans_logs')
-        .select('emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason')
+        .select(LOG_SELECT)
         .order('created_at', { ascending: false })
         .limit(1);
 
       let logResult;
       if (isSentence) {
         const r1 = await ctx.supabase.from('tb_trans_logs')
-          .select('emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason')
+          .select(LOG_SELECT)
           .eq('source_text', word)
           .order('created_at', { ascending: false })
           .limit(1);
         logResult = r1;
         if (!r1.data?.[0]) {
           const r2 = await ctx.supabase.from('tb_trans_logs')
-            .select('emotion, emotion_score, risk_score, risk_reason, intent, detected_dialect, meaning_score, meaning_reason')
+            .select(LOG_SELECT)
             .eq('standard_vi', word)
             .order('created_at', { ascending: false })
             .limit(1);
@@ -151,10 +178,18 @@ export class RingLexiconLayer {
       }
 
       analysisData = logResult?.data?.[0] ?? null;
-      console.log(`[getWordData] word="${word}" isSentence=${isSentence} riskScore=${analysisData?.risk_score} emotion=${analysisData?.emotion} lexiconMatch=${!!lexiconMatch}`);
+      transLogId = analysisData?.id ?? null;
+      console.log(`[getWordData] word="${word}" isSentence=${isSentence} riskScore=${analysisData?.risk_score} emotion=${analysisData?.emotion} lexiconMatch=${!!lexiconMatch} logId=${transLogId}`);
     } catch (e) { /* 분석값 없어도 카드는 표시 */ }
 
+    // ── tp_phrases: tb_trans_log_id 공식 키로 표현 메타 조회 ──────────
+    let phraseData = null;
+    if (transLogId) {
+      phraseData = await this.lookupPhraseByLogId(ctx, transLogId);
+    }
+
     // 사전에도 없고, 자동추출 데이터도 없고, 분석값도 없으면 NOT_FOUND
+    // (phrase만 있는 경우는 사실상 분석값이 있는 경우와 동일 경로)
     if (!data && !lexiconMatch && !analysisData) {
       return { ...ctx, _error: { code: 'NOT_FOUND', message: `Word "${word}" not found` } };
     }
@@ -188,6 +223,13 @@ export class RingLexiconLayer {
       detectedDialect: analysisData?.detected_dialect || 'unknown',
       partOfSpeech:    data?.part_of_speech || null,
       source:          data ? 'curated' : (lexiconMatch ? 'auto_extracted' : 'analysis_only'),
+      // tp_phrases 문장 경험 (tb_trans_log_id 연결)
+      phrase: phraseData ? {
+        contextType: phraseData.context_type || null,
+        frequency:   phraseData.frequency ?? 1,
+        targetText:  phraseData.target_text || null,
+        source:      phraseData.source || null,
+      } : null,
     }};
   }
 
