@@ -31,5 +31,8 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@supabase/realtime-js": "2.107.0"
   }
 }
