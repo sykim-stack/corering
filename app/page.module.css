@@ -153,3 +153,56 @@
   color: var(--color-text);
   border-color: var(--color-accent);
 }
+
+/* ── CoreHub opportunity 배너 ── */
+.opportunityBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: linear-gradient(135deg, var(--color-surface), rgba(212, 175, 55, 0.08));
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+}
+
+.opportunityCopy {
+  min-width: 0;
+  flex: 1;
+}
+
+.opportunityLabel {
+  color: var(--color-gold);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.opportunityCopy p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text);
+  font-size: var(--font-sm);
+  line-height: 1.4;
+}
+
+.opportunityAction {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-bg);
+  background: var(--color-accent);
+  border: 0;
+  border-radius: var(--radius-md);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.opportunityDismiss {
+  align-self: flex-start;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}

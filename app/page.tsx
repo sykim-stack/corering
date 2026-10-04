@@ -43,6 +43,15 @@ interface DailyWord {
   culturalNote?: string;
 }
 
+interface Opportunity {
+  id: string;
+  opportunity_type?: string;
+  priority?: 'low' | 'medium' | 'high' | string;
+  action_type?: string;
+  payload?: { message?: string; [key: string]: unknown };
+  expires_at?: string | null;
+}
+
 // ── 푸시 구독 ────────────────────────────────────────────────────────
 const subscribePush = async (deviceId: string) => {
   try {
@@ -137,6 +146,7 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
   const [shareRoomId, setShareRoomId] = useState<string | null>(null);
   const [langHistory, setLangHistory] = useState<string[]>([]);
   const [activeTab, setActiveTab]   = useState<'ring' | 'phrase'>('ring');
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [myRooms,   setMyRooms]     = useState<Room[]>(() => {
     if (typeof window === 'undefined') return [];
     return JSON.parse(localStorage.getItem('myRooms') || '[]');
@@ -262,6 +272,39 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
   useEffect(() => { validateMyRooms(); }, [validateMyRooms]);
+
+  // ── CoreHub opportunity 소비: 현재 device를 owner_key로 사용 ───────
+  useEffect(() => {
+    if (!deviceId) return;
+    let cancelled = false;
+
+    fetch(`/api/corehub/opportunities?owner_key=${encodeURIComponent(deviceId)}`, {
+      cache: 'no-store',
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (cancelled) return;
+        const items = Array.isArray(json?.data) ? json.data : [];
+        setOpportunity(items[0] || null);
+      })
+      .catch(() => {
+        // CoreHub는 보조 기능이므로 번역·채팅 화면을 막지 않는다.
+        if (!cancelled) setOpportunity(null);
+      });
+
+    return () => { cancelled = true; };
+  }, [deviceId]);
+
+  const consumeOpportunity = useCallback(async (outcome: 'shown' | 'clicked' = 'shown') => {
+    const current = opportunity;
+    setOpportunity(null);
+    if (!current?.id) return;
+    await fetch('/api/corehub/opportunities', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: current.id, outcome }),
+    }).catch(() => null);
+  }, [opportunity]);
 
   // ── 푸시 ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -617,6 +660,30 @@ export default function Home({ initialRoomId }: { initialRoomId?: string } = {})
           onClick={() => setActiveTab('phrase')}
         >CorePhrase</button>
       </div>
+
+      {activeTab === 'ring' && opportunity && !currentRoomId && (
+        <div className={styles.opportunityBanner} role="status">
+          <div className={styles.opportunityCopy}>
+            <span className={styles.opportunityLabel}>COREHUB</span>
+            <p>{opportunity.payload?.message || '지금 이어서 해보면 좋아요.'}</p>
+          </div>
+          <button
+            type="button"
+            className={styles.opportunityAction}
+            onClick={() => consumeOpportunity('clicked')}
+          >
+            확인
+          </button>
+          <button
+            type="button"
+            className={styles.opportunityDismiss}
+            aria-label="기회 닫기"
+            onClick={() => consumeOpportunity('shown')}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {activeTab === 'phrase' && <CorePhrase userId={deviceId} />}
 
